@@ -19,7 +19,7 @@ public class OpenApiConfig {
                         .version("v1.0.0")
                         .contact(new Contact()
                                 .name("Calvin Power")
-                                .email("calvin@example.com"))
+                                .email("calvinpower44@gmail.com"))
                         .license(new License()
                                 .name("MIT")
                                 .url("https://opensource.org/licenses/MIT"))
