@@ -20,6 +20,50 @@ public interface MeasurementRepository extends JpaRepository<Measurement, Long> 
     );
 
     @Query("""
+            SELECT m
+            FROM Measurement m
+            WHERE m.metric IN :metrics
+              AND m.recordedAt BETWEEN :from AND :to
+            """)
+    List<Measurement> findByMetricsAndRecordedAtBetween(
+            @Param("metrics") Collection<Metric> metrics,
+            @Param("from") Instant from,
+            @Param("to") Instant to
+    );
+
+    @Query("""
+            SELECT m
+            FROM Measurement m
+            WHERE m.sensor.id IN :sensorIds
+              AND m.metric IN :metrics
+              AND m.recordedAt = (
+                  SELECT MAX(m2.recordedAt)
+                  FROM Measurement m2
+                  WHERE m2.sensor.id = m.sensor.id
+                    AND m2.metric = m.metric
+              )
+            """)
+    List<Measurement> findLatestBySensorIdsAndMetrics(
+            @Param("sensorIds") Collection<Long> sensorIds,
+            @Param("metrics") Collection<Metric> metrics
+    );
+
+    @Query("""
+            SELECT m
+            FROM Measurement m
+            WHERE m.metric IN :metrics
+              AND m.recordedAt = (
+                  SELECT MAX(m2.recordedAt)
+                  FROM Measurement m2
+                  WHERE m2.sensor.id = m.sensor.id
+                    AND m2.metric = m.metric
+              )
+            """)
+    List<Measurement> findLatestByMetrics(
+            @Param("metrics") Collection<Metric> metrics
+    );
+
+    @Query("""
             SELECT new com.calvinpower.weatherservice.repository.MeasurementAggregate(
                 m.sensor.id,
                 m.metric,
@@ -72,8 +116,8 @@ public interface MeasurementRepository extends JpaRepository<Measurement, Long> 
     List<MeasurementAggregate> findMaxBySensorsAndMetricsAndRecordedAtBetween(
             @Param("sensorIds") Collection<Long> sensorIds,
             @Param("metrics") Collection<Metric> metrics,
-            @Param("from") Instant from,
-            @Param("to") Instant to
+            Instant from,
+            Instant to
     );
 
     @Query("""
@@ -91,7 +135,7 @@ public interface MeasurementRepository extends JpaRepository<Measurement, Long> 
     List<MeasurementAggregate> findSumBySensorsAndMetricsAndRecordedAtBetween(
             @Param("sensorIds") Collection<Long> sensorIds,
             @Param("metrics") Collection<Metric> metrics,
-            @Param("from") Instant from,
-            @Param("to") Instant to
+            Instant from,
+            Instant to
     );
 }

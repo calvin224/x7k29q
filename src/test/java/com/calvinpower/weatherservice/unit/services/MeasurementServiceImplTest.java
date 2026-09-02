@@ -11,6 +11,7 @@ import com.calvinpower.weatherservice.repository.SensorRepository;
 import com.calvinpower.weatherservice.services.MeasurementServiceImpl;
 import com.calvinpower.weatherservice.services.statistics.StatisticStrategy;
 import com.calvinpower.weatherservice.services.statistics.StatisticStrategyFactory;
+import com.calvinpower.weatherservice.services.validation.DateRangeValidator;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -32,11 +33,15 @@ class MeasurementServiceImplTest {
     private final StatisticStrategyFactory statisticStrategyFactory =
             mock(StatisticStrategyFactory.class);
 
+    private final DateRangeValidator dateRangeValidator =
+            new DateRangeValidator();
+
     private final MeasurementServiceImpl measurementService =
             new MeasurementServiceImpl(
                     measurementRepository,
                     sensorRepository,
-                    statisticStrategyFactory
+                    statisticStrategyFactory,
+                    dateRangeValidator
             );
 
     @Test
@@ -185,6 +190,161 @@ class MeasurementServiceImplTest {
                         metrics,
                         from,
                         to
+                );
+    }
+
+    @Test
+    void given_invalid_measurement_date_range_when_getting_measurements_then_throws_exception() {
+        Instant from = Instant.parse("2026-09-01T00:00:00Z");
+        Instant to = Instant.parse("2026-09-01T12:00:00Z");
+
+        List<Long> sensorIds = List.of(1L);
+        List<Metric> metrics = List.of(Metric.TEMPERATURE);
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> measurementService.getMeasurements(
+                        sensorIds,
+                        metrics,
+                        from,
+                        to
+                )
+        );
+
+        verify(measurementRepository, never())
+                .findBySensor_IdInAndMetricInAndRecordedAtBetween(
+                        anyCollection(),
+                        anyCollection(),
+                        any(Instant.class),
+                        any(Instant.class)
+                );
+    }
+
+    @Test
+    void given_invalid_statistic_date_range_when_getting_statistics_then_throws_exception() {
+        Instant from = Instant.parse("2026-09-01T00:00:00Z");
+        Instant to = Instant.parse("2026-09-01T12:00:00Z");
+
+        List<Long> sensorIds = List.of(1L);
+        List<Metric> metrics = List.of(Metric.TEMPERATURE);
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> measurementService.getStatistics(
+                        sensorIds,
+                        metrics,
+                        Statistic.AVERAGE,
+                        from,
+                        to
+                )
+        );
+
+        verifyNoInteractions(statisticStrategyFactory);
+    }
+
+    @Test
+    void given_no_dates_when_getting_measurements_then_returns_latest_measurements() {
+        List<Long> sensorIds = List.of(1L);
+        List<Metric> metrics = List.of(Metric.TEMPERATURE);
+
+        Sensor sensor = new Sensor(1L);
+
+        Measurement latestMeasurement = new Measurement(
+                sensor,
+                Metric.TEMPERATURE,
+                21.5,
+                Instant.parse("2026-09-02T10:30:00Z")
+        );
+
+        List<Measurement> expected = List.of(latestMeasurement);
+
+        when(measurementRepository.findLatestBySensorIdsAndMetrics(
+                sensorIds,
+                metrics
+        )).thenReturn(expected);
+
+        List<Measurement> result =
+                measurementService.getMeasurements(
+                        sensorIds,
+                        metrics,
+                        null,
+                        null
+                );
+
+        assertEquals(expected, result);
+
+        verify(measurementRepository)
+                .findLatestBySensorIdsAndMetrics(
+                        sensorIds,
+                        metrics
+                );
+
+        verify(measurementRepository, never())
+                .findBySensor_IdInAndMetricInAndRecordedAtBetween(
+                        anyCollection(),
+                        anyCollection(),
+                        any(Instant.class),
+                        any(Instant.class)
+                );
+    }
+
+    @Test
+    void given_empty_sensor_ids_when_getting_measurements_then_returns_measurements_from_all_sensors() {
+        List<Long> sensorIds = List.of();
+        List<Metric> metrics = List.of(Metric.TEMPERATURE);
+
+        Instant from =
+                Instant.parse("2026-09-01T00:00:00Z");
+        Instant to =
+                Instant.parse("2026-09-02T00:00:00Z");
+
+        Sensor firstSensor = new Sensor(1L);
+        Sensor secondSensor = new Sensor(2L);
+
+        List<Measurement> expected = List.of(
+                new Measurement(
+                        firstSensor,
+                        Metric.TEMPERATURE,
+                        21.5,
+                        Instant.parse("2026-09-01T10:00:00Z")
+                ),
+                new Measurement(
+                        secondSensor,
+                        Metric.TEMPERATURE,
+                        25.0,
+                        Instant.parse("2026-09-01T11:00:00Z")
+                )
+        );
+
+        when(measurementRepository.findByMetricsAndRecordedAtBetween(
+                metrics,
+                from,
+                to
+        )).thenReturn(expected);
+
+        List<Measurement> result =
+                measurementService.getMeasurements(
+                        sensorIds,
+                        metrics,
+                        from,
+                        to
+                );
+
+        assertEquals(expected, result);
+
+        verify(measurementRepository)
+                .findByMetricsAndRecordedAtBetween(
+                        metrics,
+                        from,
+                        to
+                );
+
+        verify(measurementRepository, never())
+                .findBySensor_IdInAndMetricInAndRecordedAtBetween(
+                        anyCollection(),
+                        anyCollection(),
+                        any(Instant.class),
+                        any(Instant.class)
                 );
     }
 }
