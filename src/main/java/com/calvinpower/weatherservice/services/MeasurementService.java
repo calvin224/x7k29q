@@ -11,6 +11,13 @@ import java.util.List;
 
 public interface MeasurementService {
 
+    Measurement createMeasurement(
+            Long sensorId,
+            Metric metric,
+            Double value,
+            Instant recordedAt
+    );
+
     List<Measurement> getMeasurements(
             Collection<Long> sensorIds,
             Collection<Metric> metrics,
