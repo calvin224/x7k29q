@@ -1,4 +1,4 @@
-package com.calvinpower.weatherservice;
+package com.calvinpower.weatherservice.unit;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
