@@ -3,32 +3,11 @@ name: Build
 on:
   pull_request:
   push:
-    branches:
-      - main
+    branches: [ main ]
 
 jobs:
-  unit-tests:
-    name: Unit Tests
+  build-and-analyze:
     runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 25
-        uses: actions/setup-java@v4
-        with:
-          java-version: '25'
-          distribution: 'corretto'
-          cache: maven
-
-      - name: Run unit tests
-        run: ./mvnw test -Dtest="com.calvinpower.weatherservice.unit.**"
-
-  integration-tests:
-    name: Integration Tests
-    runs-on: ubuntu-latest
-
     services:
       postgres:
         image: postgres:17
@@ -45,53 +24,18 @@ jobs:
           --health-retries=5
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 25
-        uses: actions/setup-java@v4
-        with:
-          java-version: '25'
-          distribution: 'corretto'
-          cache: maven
-
-      - name: Run integration tests
-        run: ./mvnw test -Dtest="com.calvinpower.weatherservice.integration.**"
-
-  sonarqube:
-    name: SonarQube
-    runs-on: ubuntu-latest
-
-    services:
-      postgres:
-        image: postgres:17
-        env:
-          POSTGRES_DB: weather
-          POSTGRES_USER: weather
-          POSTGRES_PASSWORD: weather
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd="pg_isready -U weather -d weather"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Set up JDK 25
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           java-version: '25'
           distribution: 'corretto'
           cache: maven
 
       - name: Run tests with coverage
-        run: ./mvnw verify
+        run: ./mvnw clean verify
 
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v5
