@@ -21,6 +21,8 @@
 
     <properties>
         <java.version>25</java.version>
+        <sonar.projectKey>calvin224_x7k29q</sonar.projectKey>
+        <sonar.organization>calvin224</sonar.organization>
     </properties>
 
     <dependencies>
@@ -67,7 +69,7 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
-        
+
         <!-- for mocking web requests -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
