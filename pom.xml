@@ -23,6 +23,8 @@
         <java.version>25</java.version>
         <sonar.projectKey>calvin224_x7k29q</sonar.projectKey>
         <sonar.organization>calvin224</sonar.organization>
+        <sonar.sources>src/main/java</sonar.sources>
+        <sonar.tests>src/test/java</sonar.tests>
     </properties>
 
     <dependencies>
