@@ -1,10 +1,13 @@
 package com.calvinpower.weatherservice.services;
 
+import com.calvinpower.weatherservice.exception.SensorNotFoundException;
 import com.calvinpower.weatherservice.model.Measurement;
 import com.calvinpower.weatherservice.model.Metric;
+import com.calvinpower.weatherservice.model.Sensor;
 import com.calvinpower.weatherservice.model.Statistic;
 import com.calvinpower.weatherservice.repository.MeasurementAggregate;
 import com.calvinpower.weatherservice.repository.MeasurementRepository;
+import com.calvinpower.weatherservice.repository.SensorRepository;
 import com.calvinpower.weatherservice.services.statistics.StatisticStrategy;
 import com.calvinpower.weatherservice.services.statistics.StatisticStrategyFactory;
 import org.springframework.stereotype.Service;
@@ -17,14 +20,39 @@ import java.util.List;
 public class MeasurementServiceImpl implements MeasurementService {
 
     private final MeasurementRepository measurementRepository;
+    private final SensorRepository sensorRepository;
     private final StatisticStrategyFactory statisticStrategyFactory;
 
     public MeasurementServiceImpl(
             MeasurementRepository measurementRepository,
+            SensorRepository sensorRepository,
             StatisticStrategyFactory statisticStrategyFactory
     ) {
         this.measurementRepository = measurementRepository;
+        this.sensorRepository = sensorRepository;
         this.statisticStrategyFactory = statisticStrategyFactory;
+    }
+
+    @Override
+    public Measurement createMeasurement(
+            Long sensorId,
+            Metric metric,
+            Double value,
+            Instant recordedAt
+    ) {
+        Sensor sensor = sensorRepository.findById(sensorId)
+                .orElseThrow(() ->
+                        new SensorNotFoundException(sensorId)
+                );
+
+        Measurement measurement = new Measurement(
+                sensor,
+                metric,
+                value,
+                recordedAt
+        );
+
+        return measurementRepository.save(measurement);
     }
 
     @Override
