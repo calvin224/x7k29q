@@ -10,6 +10,7 @@ import com.calvinpower.weatherservice.repository.MeasurementRepository;
 import com.calvinpower.weatherservice.repository.SensorRepository;
 import com.calvinpower.weatherservice.services.statistics.StatisticStrategy;
 import com.calvinpower.weatherservice.services.statistics.StatisticStrategyFactory;
+import com.calvinpower.weatherservice.services.validation.DateRangeValidator;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -22,15 +23,18 @@ public class MeasurementServiceImpl implements MeasurementService {
     private final MeasurementRepository measurementRepository;
     private final SensorRepository sensorRepository;
     private final StatisticStrategyFactory statisticStrategyFactory;
+    private final DateRangeValidator dateRangeValidator;
 
     public MeasurementServiceImpl(
             MeasurementRepository measurementRepository,
             SensorRepository sensorRepository,
-            StatisticStrategyFactory statisticStrategyFactory
+            StatisticStrategyFactory statisticStrategyFactory,
+            DateRangeValidator dateRangeValidator
     ) {
         this.measurementRepository = measurementRepository;
         this.sensorRepository = sensorRepository;
         this.statisticStrategyFactory = statisticStrategyFactory;
+        this.dateRangeValidator = dateRangeValidator;
     }
 
     @Override
@@ -62,6 +66,30 @@ public class MeasurementServiceImpl implements MeasurementService {
             Instant from,
             Instant to
     ) {
+        dateRangeValidator.validate(from, to);
+
+        if (sensorIds.isEmpty()) {
+            if (from == null && to == null) {
+                return measurementRepository
+                        .findLatestByMetrics(metrics);
+            }
+
+            return measurementRepository
+                    .findByMetricsAndRecordedAtBetween(
+                            metrics,
+                            from,
+                            to
+                    );
+        }
+
+        if (from == null && to == null) {
+            return measurementRepository
+                    .findLatestBySensorIdsAndMetrics(
+                            sensorIds,
+                            metrics
+                    );
+        }
+
         return measurementRepository
                 .findBySensor_IdInAndMetricInAndRecordedAtBetween(
                         sensorIds,
@@ -79,6 +107,8 @@ public class MeasurementServiceImpl implements MeasurementService {
             Instant from,
             Instant to
     ) {
+        dateRangeValidator.validate(from, to);
+
         StatisticStrategy strategy =
                 statisticStrategyFactory.getStrategy(statistic);
 
