@@ -74,6 +74,9 @@ jobs:
           distribution: 'corretto'
           cache: maven
 
+      - name: Run tests with coverage
+        run: ./mvnw verify
+
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v5
         env:
