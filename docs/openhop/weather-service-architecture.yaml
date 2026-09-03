@@ -1,0 +1,561 @@
+meta:
+  title: Weather Service Architecture
+  description: Follow sensor registration, measurement ingestion, and database-backed statistic calculation through the Spring Boot layers.
+  path: weather-service/architecture
+
+flow:
+  nodes:
+    - id: api-client
+      label: API Client
+      type: actor
+      icon: twemoji:satellite-antenna
+      color: "#38bdf8"
+
+    - id: layered-architecture
+      label: Application Layers
+      type: service
+      icon: twemoji:building-construction
+      color: "#14b8a6"
+      flow:
+        nodes:
+          - id: layer-client
+            label: REST Client
+            type: actor
+            icon: twemoji:satellite-antenna
+            color: "#38bdf8"
+          - id: layer-controller
+            label: Controller Layer
+            type: endpoint
+            icon: logos:spring-icon
+            color: "#6db33f"
+          - id: layer-service
+            label: Service Layer
+            type: service
+            icon: twemoji:gear
+            color: "#3b82f6"
+          - id: layer-repository
+            label: Repository Layer
+            type: service
+            icon: twemoji:file-cabinet
+            color: "#8b5cf6"
+          - id: layer-postgres
+            label: PostgreSQL
+            type: database
+            icon: logos:postgresql
+            color: "#336791"
+        steps:
+          - from: layer-client
+            to: layer-controller
+            data:
+              label: A REST client sends sensor, measurement, or statistics input to the matching Spring MVC controller at the API boundary.
+              fields:
+                - name: request
+                  type: JSON
+                - name: validation
+                  type: Jakarta Bean Validation
+          - from: layer-controller
+            to: layer-service
+            data:
+              label: The controller translates validated transport data into a focused service call without making persistence decisions.
+              fields:
+                - name: controllers
+                  type: SensorController|MeasurementController
+                - name: input
+                  type: DTO values
+          - from: layer-service
+            to: layer-repository
+            data:
+              label: The service applies domain rules and delegates storage or aggregate work through Spring Data repository interfaces.
+              fields:
+                - name: services
+                  type: SensorService|MeasurementService
+                - name: operation
+                  type: create|query|aggregate
+          - from: layer-repository
+            to: layer-postgres
+            data:
+              label: The repository converts the requested operation into database work while PostgreSQL persists rows and calculates grouped statistics.
+              fields:
+                - name: repositories
+                  type: SensorRepository|MeasurementRepository
+                - name: storage
+                  type: PostgreSQL
+          - from: layer-postgres
+            to: layer-repository
+            data:
+              label: PostgreSQL returns persisted entities or aggregate projections to the repository boundary.
+              fields:
+                - name: result
+                  type: Entity|MeasurementAggregate
+          - from: layer-repository
+            to: layer-service
+            data:
+              label: The repository result returns to the service so domain orchestration completes before the HTTP response is created.
+              fields:
+                - name: result
+                  type: domain result
+          - from: layer-service
+            to: layer-controller
+            data:
+              label: The service returns the completed operation to the controller, which maps domain data into the public response model.
+              fields:
+                - name: response
+                  type: response DTO
+          - from: layer-controller
+            to: layer-client
+            data:
+              label: The controller sends a clear HTTP status and JSON response back to the caller.
+              fields:
+                - name: status
+                  type: HTTP status
+                - name: body
+                  type: JSON
+
+    - id: sensor-creation
+      label: Sensor Creation
+      type: endpoint
+      icon: twemoji:thermometer
+      color: "#22c55e"
+      flow:
+        nodes:
+          - id: sensor-controller
+            label: Sensor Controller
+            type: endpoint
+            icon: logos:spring-icon
+            color: "#6db33f"
+          - id: sensor-service
+            label: Sensor Service
+            type: service
+            icon: twemoji:gear
+            color: "#3b82f6"
+          - id: sensor-repository
+            label: Sensor Repository
+            type: service
+            icon: twemoji:file-cabinet
+            color: "#8b5cf6"
+          - id: sensor-postgres
+            label: PostgreSQL
+            type: database
+            icon: logos:postgresql
+            color: "#336791"
+        steps:
+          - from: sensor-controller
+            to: sensor-service
+            data:
+              label: The controller passes the validated optional sensor name into the service responsible for creating the domain object.
+              fields:
+                - name: name
+                  type: string|null
+          - from: sensor-service
+            to: sensor-repository
+            data:
+              label: The service creates a named or unnamed sensor and asks the persistence boundary to save it.
+              fields:
+                - name: sensor
+                  type: Sensor
+          - from: sensor-repository
+            to: sensor-postgres
+            data:
+              label: Spring Data JPA inserts the sensor row and lets PostgreSQL generate its durable numeric identifier.
+              fields:
+                - name: table
+                  type: sensors
+                - name: generated_id
+                  type: long
+                  added: true
+          - from: sensor-postgres
+            to: sensor-repository
+            data:
+              label: PostgreSQL returns the saved row with its generated identifier populated.
+              fields:
+                - name: id
+                  type: long
+                - name: name
+                  type: string|null
+          - from: sensor-repository
+            to: sensor-service
+            data:
+              label: The repository returns the persisted sensor to the service with its generated identifier populated.
+              fields:
+                - name: sensor
+                  type: Sensor
+          - from: sensor-service
+            to: sensor-controller
+            data:
+              label: The service returns the created sensor to the HTTP boundary, which maps its identifier and optional name into the response.
+              fields:
+                - name: response
+                  type: SensorResponse
+                - name: status
+                  type: 201 Created
+
+    - id: measurement-ingestion
+      label: Measurement Ingestion
+      type: endpoint
+      icon: twemoji:cloud-with-rain
+      color: "#0ea5e9"
+      flow:
+        nodes:
+          - id: measurement-controller
+            label: Measurement Controller
+            type: endpoint
+            icon: logos:spring-icon
+            color: "#6db33f"
+          - id: measurement-service
+            label: Measurement Service
+            type: service
+            icon: twemoji:gear
+            color: "#3b82f6"
+          - id: sensor-lookup
+            label: Sensor Repository
+            type: service
+            icon: twemoji:magnifying-glass-tilted-left
+            color: "#8b5cf6"
+          - id: measurement-repository
+            label: Measurement Repository
+            type: service
+            icon: twemoji:file-cabinet
+            color: "#a855f7"
+          - id: measurement-postgres
+            label: PostgreSQL
+            type: database
+            icon: logos:postgresql
+            color: "#336791"
+        steps:
+          - from: measurement-controller
+            to: measurement-service
+            data:
+              label: The controller passes the validated metric value and observation time together with the selected sensor identifier.
+              fields:
+                - name: sensorId
+                  type: long
+                - name: metric
+                  type: Metric
+                - name: value
+                  type: double
+                - name: recordedAt
+                  type: Instant
+          - from: measurement-service
+            to: sensor-lookup
+            data:
+              label: Before recording weather data, the service asks for the parent sensor so a reading can never reference a missing sensor.
+              fields:
+                - name: sensorId
+                  type: long
+          - from: sensor-lookup
+            to: measurement-service
+            data:
+              label: The repository returns the matching sensor, or the service stops the request with a not-found response when none exists.
+              fields:
+                - name: sensor
+                  type: Optional<Sensor>
+          - from: measurement-service
+            to: measurement-repository
+            data:
+              label: The service links the reading to the resolved sensor and sends the complete measurement to the persistence boundary.
+              fields:
+                - name: measurement
+                  type: Measurement
+                - name: sensor
+                  type: Sensor
+          - from: measurement-repository
+            to: measurement-postgres
+            data:
+              label: Spring Data JPA inserts the timestamped metric while PostgreSQL enforces the foreign key back to the sensor.
+              fields:
+                - name: table
+                  type: sensor_measurements
+                - name: sensor_id
+                  type: long
+                - name: recorded_at
+                  type: timestamptz
+          - from: measurement-postgres
+            to: measurement-repository
+            data:
+              label: PostgreSQL returns the persisted measurement, including its generated identifier, to the repository boundary.
+              fields:
+                - name: measurement
+                  type: Measurement
+          - from: measurement-repository
+            to: measurement-service
+            data:
+              label: The repository returns the saved measurement to the service after persistence completes successfully.
+              fields:
+                - name: measurement
+                  type: Measurement
+          - from: measurement-service
+            to: measurement-controller
+            data:
+              label: The service returns the saved reading to the HTTP boundary, which maps it into the created-measurement response.
+              fields:
+                - name: response
+                  type: MeasurementResponse
+                - name: status
+                  type: 201 Created
+
+    - id: statistics-query
+      label: Statistics Query
+      type: endpoint
+      icon: twemoji:bar-chart
+      color: "#f59e0b"
+      flow:
+        nodes:
+          - id: statistics-controller
+            label: Measurement Controller
+            type: endpoint
+            icon: logos:spring-icon
+            color: "#6db33f"
+          - id: statistics-service
+            label: Measurement Service
+            type: service
+            icon: twemoji:gear
+            color: "#3b82f6"
+          - id: strategy-factory
+            label: Strategy Factory
+            type: service
+            icon: twemoji:factory
+            color: "#f97316"
+            flow:
+              nodes:
+                - id: statistic-value
+                  label: Statistic Value
+                  type: custom
+                  icon: twemoji:input-numbers
+                  color: "#f59e0b"
+                - id: strategy-map
+                  label: Strategy Map
+                  type: service
+                  icon: twemoji:world-map
+                  color: "#8b5cf6"
+                - id: min-strategy
+                  label: Minimum Strategy
+                  type: service
+                  icon: twemoji:down-arrow
+                  color: "#06b6d4"
+                - id: max-strategy
+                  label: Maximum Strategy
+                  type: service
+                  icon: twemoji:up-arrow
+                  color: "#ef4444"
+                - id: sum-strategy
+                  label: Sum Strategy
+                  type: service
+                  icon: twemoji:heavy-plus-sign
+                  color: "#22c55e"
+                - id: average-strategy
+                  label: Average Strategy
+                  type: service
+                  icon: twemoji:balance-scale
+                  color: "#eab308"
+              steps:
+                - from: statistic-value
+                  to: strategy-map
+                  data:
+                    label: The requested statistic is used as a key into the immutable map of strategy implementations assembled by Spring.
+                    fields:
+                      - name: statistic
+                        type: MIN|MAX|SUM|AVERAGE
+                - from: strategy-map
+                  to: min-strategy
+                  data:
+                    label: When the request asks for the minimum, the factory returns the implementation that delegates to database minimum aggregation.
+                    fields:
+                      - name: MIN
+                        type: MinStatisticStrategy
+                - from: strategy-map
+                  to: max-strategy
+                  data:
+                    label: When the request asks for the maximum, the factory returns the implementation that delegates to database maximum aggregation.
+                    fields:
+                      - name: MAX
+                        type: MaxStatisticStrategy
+                - from: strategy-map
+                  to: sum-strategy
+                  data:
+                    label: When the request asks for a total, the factory returns the implementation that delegates to database sum aggregation.
+                    fields:
+                      - name: SUM
+                        type: SumStatisticStrategy
+                - from: strategy-map
+                  to: average-strategy
+                  data:
+                    label: When the request asks for an average, the factory returns the implementation that delegates to database average aggregation.
+                    fields:
+                      - name: AVERAGE
+                        type: AverageStatisticStrategy
+          - id: selected-strategy
+            label: Selected Strategy
+            type: service
+            icon: twemoji:bullseye
+            color: "#eab308"
+          - id: statistics-repository
+            label: Measurement Repository
+            type: service
+            icon: twemoji:file-cabinet
+            color: "#8b5cf6"
+          - id: statistics-postgres
+            label: PostgreSQL
+            type: database
+            icon: logos:postgresql
+            color: "#336791"
+        steps:
+          - from: statistics-controller
+            to: statistics-service
+            data:
+              label: The controller passes validated sensor, metric, statistic, and date-range selections into the application service.
+              fields:
+                - name: sensorIds
+                  type: list<long>
+                - name: metrics
+                  type: list<Metric>
+                - name: statistic
+                  type: Statistic
+                - name: from
+                  type: Instant
+                - name: to
+                  type: Instant
+          - from: statistics-service
+            to: strategy-factory
+            drilldown: true
+            data:
+              label: After validating the date range, the service asks the factory for exactly one implementation matching the requested statistic.
+              fields:
+                - name: statistic
+                  type: MIN|MAX|SUM|AVERAGE
+          - from: strategy-factory
+            to: selected-strategy
+            data:
+              label: The factory returns the chosen strategy, keeping aggregate-specific decisions out of the controller and service orchestration.
+              fields:
+                - name: strategy
+                  type: StatisticStrategy
+          - from: selected-strategy
+            to: statistics-repository
+            data:
+              label: The selected strategy chooses the matching repository aggregate query for the requested sensors, metrics, and time window.
+              fields:
+                - name: sensorIds
+                  type: list<long>
+                - name: metrics
+                  type: list<Metric>
+                - name: range
+                  type: InstantRange
+          - from: statistics-repository
+            to: statistics-postgres
+            data:
+              label: The repository sends a grouped aggregate query so PostgreSQL performs the calculation close to the stored measurements.
+              fields:
+                - name: aggregate
+                  type: MIN|MAX|SUM|AVG
+                - name: grouping
+                  type: sensor_id+metric
+          - from: statistics-postgres
+            to: statistics-repository
+            data:
+              label: PostgreSQL returns one calculated value for each matching sensor and metric combination.
+              fields:
+                - name: results
+                  type: list<MeasurementAggregate>
+          - from: statistics-repository
+            to: selected-strategy
+            data:
+              label: The repository returns the database-calculated projections to the selected strategy implementation.
+              fields:
+                - name: aggregates
+                  type: list<MeasurementAggregate>
+          - from: selected-strategy
+            to: statistics-service
+            data:
+              label: The selected strategy returns the aggregate results without duplicating MIN, MAX, SUM, or AVERAGE logic in the service.
+              fields:
+                - name: aggregates
+                  type: list<MeasurementAggregate>
+          - from: statistics-service
+            to: statistics-controller
+            data:
+              label: The service returns aggregate projections to the controller, which maps them into the public statistics response array.
+              fields:
+                - name: response
+                  type: list<StatisticResponse>
+                - name: status
+                  type: 200 OK
+
+  steps:
+    - from: api-client
+      to: layered-architecture
+      drilldown: true
+      data:
+        label: Start with the shared request path used by every feature, from the REST boundary through Spring Boot and into PostgreSQL.
+        fields:
+          - name: pattern
+            type: Controller->Service->Repository->PostgreSQL
+    - from: layered-architecture
+      to: api-client
+      data:
+        label: Return to the client view before exploring each concrete weather-service journey in detail.
+        fields:
+          - name: journeys
+            type: sensor creation|measurement ingestion|statistics query
+    - from: api-client
+      to: sensor-creation
+      drilldown: true
+      data:
+        label: The client begins by registering a sensor that can own future weather measurements.
+        fields:
+          - name: name
+            type: string|null
+    - from: sensor-creation
+      to: api-client
+      data:
+        label: The service confirms registration and gives the client the generated sensor identifier.
+        fields:
+          - name: sensorId
+            type: long
+          - name: status
+            type: 201 Created
+    - from: api-client
+      to: measurement-ingestion
+      drilldown: true
+      data:
+        label: As weather changes, the sensor submits a timestamped metric value for storage.
+        fields:
+          - name: sensorId
+            type: long
+          - name: metric
+            type: Metric
+          - name: value
+            type: double
+          - name: recordedAt
+            type: Instant
+    - from: measurement-ingestion
+      to: api-client
+      data:
+        label: The service confirms that the reading is attached to the sensor and safely persisted.
+        fields:
+          - name: measurementId
+            type: long
+          - name: status
+            type: 201 Created
+    - from: api-client
+      to: statistics-query
+      drilldown: true
+      data:
+        label: The client asks for one aggregate across selected sensors, metrics, and a bounded period of weather history.
+        fields:
+          - name: sensorIds
+            type: list<long>
+          - name: metrics
+            type: list<Metric>
+          - name: statistic
+            type: MIN|MAX|SUM|AVERAGE
+          - name: dateRange
+            type: InstantRange
+    - from: statistics-query
+      to: api-client
+      data:
+        label: The service returns the database-calculated result grouped by sensor and metric.
+        fields:
+          - name: statistics
+            type: list<StatisticResponse>
+          - name: status
+            type: 200 OK
