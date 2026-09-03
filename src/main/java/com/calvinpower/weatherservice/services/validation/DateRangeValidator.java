@@ -1,5 +1,6 @@
 package com.calvinpower.weatherservice.services.validation;
 
+import com.calvinpower.weatherservice.exception.InvalidDateRangeException;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -15,19 +16,19 @@ public class DateRangeValidator {
         }
 
         if (from == null || to == null) {
-            throw new IllegalArgumentException(
-                    "Both from and to must be provided"
+            throw new InvalidDateRangeException(
+                    "Both from and to must be provided together"
             );
         }
 
         if (!from.isBefore(to)) {
-            throw new IllegalArgumentException(
+            throw new InvalidDateRangeException(
                     "from must be before to"
             );
         }
 
         if (to.isBefore(from.plusSeconds(86_400))) {
-            throw new IllegalArgumentException(
+            throw new InvalidDateRangeException(
                     "Date range must be at least one day"
             );
         }
@@ -39,7 +40,7 @@ public class DateRangeValidator {
                 to.atOffset(ZoneOffset.UTC);
 
         if (toDateTime.isAfter(fromDateTime.plusMonths(1))) {
-            throw new IllegalArgumentException(
+            throw new InvalidDateRangeException(
                     "Date range must not exceed one month"
             );
         }

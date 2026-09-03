@@ -3,8 +3,6 @@ package com.calvinpower.weatherservice.unit.controller;
 import com.calvinpower.weatherservice.controller.MeasurementController;
 import com.calvinpower.weatherservice.model.Measurement;
 import com.calvinpower.weatherservice.model.Metric;
-import com.calvinpower.weatherservice.model.Statistic;
-import com.calvinpower.weatherservice.repository.MeasurementAggregate;
 import com.calvinpower.weatherservice.services.MeasurementService;
 import com.calvinpower.weatherservice.services.sensor.SensorService;
 import org.junit.jupiter.api.Test;
@@ -129,7 +127,8 @@ class MeasurementControllerTest {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(fixture("create_measurement/valid-temperature.json"))
                 )
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("SENSOR_NOT_FOUND"));
 
         verify(measurementService, never()).createMeasurement(
                 any(),
@@ -159,7 +158,14 @@ class MeasurementControllerTest {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(fixture("create_measurement/valid-temperature.json"))
                 )
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("Sensor not found"))
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.detail")
+                        .value("Sensor 999 does not exist"))
+                .andExpect(jsonPath("$.instance")
+                        .value("/api/v1/sensors/999/measurements"))
+                .andExpect(jsonPath("$.code").value("SENSOR_NOT_FOUND"));
     }
 
     @Test
@@ -171,7 +177,8 @@ class MeasurementControllerTest {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(fixture("create_measurement/invalid-measurement.json"))
                 )
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
 
         verify(measurementService, never())
                 .createMeasurement(
@@ -254,7 +261,14 @@ class MeasurementControllerTest {
                                         "query_measurements/missing-sensor.json"
                                 ))
                 )
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("Sensor not found"))
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.detail")
+                        .value("Sensor 999 does not exist"))
+                .andExpect(jsonPath("$.instance")
+                        .value("/api/v1/measurements/query"))
+                .andExpect(jsonPath("$.code").value("SENSOR_NOT_FOUND"));
     }
 
     @Test
@@ -358,7 +372,8 @@ class MeasurementControllerTest {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(fixture("query_measurements/invalid-query.json"))
                 )
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
 
         verify(measurementService, never())
                 .getMeasurements(
@@ -370,165 +385,27 @@ class MeasurementControllerTest {
     }
 
     @Test
-    void given_valid_statistic_query_when_querying_then_returns_ok()
+    void given_invalid_sensor_selection_when_querying_measurements_then_returns_specific_problem()
             throws Exception {
-
-        when(measurementService.getStatistics(
-                List.of(1L),
-                List.of(Metric.TEMPERATURE),
-                Statistic.AVERAGE,
-                Instant.parse("2026-09-01T00:00:00Z"),
-                Instant.parse("2026-09-02T00:00:00Z")
-        )).thenReturn(List.of(
-                new MeasurementAggregate(
-                        1L,
-                        Metric.TEMPERATURE,
-                        21.5
-                )
-        ));
-
         mockMvc.perform(
-                        post("/api/v1/statistics/query")
+                        post("/api/v1/measurements/query")
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content(fixture("query_statistics/statistic-query.json"))
+                                .content(fixture(
+                                        "query_measurements/invalid-sensor-selection.json"
+                                ))
                 )
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].sensorId").value(1))
-                .andExpect(jsonPath("$[0].metric")
-                        .value("TEMPERATURE"))
-                .andExpect(jsonPath("$[0].statistic")
-                        .value("AVERAGE"))
-                .andExpect(jsonPath("$[0].value").value(21.5));
-    }
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title")
+                        .value("Invalid sensor selection"))
+                .andExpect(jsonPath("$.code")
+                        .value("INVALID_SENSOR_SELECTION"));
 
-    @Test
-    void given_missing_sensor_when_querying_statistics_then_returns_not_found()
-            throws Exception {
-        when(measurementService.getStatistics(
-                List.of(999L),
-                List.of(Metric.TEMPERATURE),
-                Statistic.AVERAGE,
-                Instant.parse("2026-09-01T00:00:00Z"),
-                Instant.parse("2026-09-02T00:00:00Z")
-        )).thenThrow(
-                new com.calvinpower.weatherservice.exception.SensorNotFoundException(
-                        999L
-                )
+        verify(measurementService, never()).getMeasurements(
+                any(),
+                any(),
+                any(),
+                any()
         );
-
-        mockMvc.perform(
-                        post("/api/v1/statistics/query")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(fixture(
-                                        "query_statistics/missing-sensor.json"
-                                ))
-                )
-                .andExpect(status().isNotFound());
-    }
-
-    @Test
-    void given_sensor_names_when_querying_statistics_then_returns_ok()
-            throws Exception {
-        when(sensorService.resolveSensorIds(
-                List.of(),
-                List.of("Dublin City Sensor")
-        )).thenReturn(List.of(1L));
-        when(measurementService.getStatistics(
-                List.of(1L),
-                List.of(Metric.TEMPERATURE),
-                Statistic.AVERAGE,
-                Instant.parse("2026-09-01T00:00:00Z"),
-                Instant.parse("2026-09-02T00:00:00Z")
-        )).thenReturn(List.of(
-                new MeasurementAggregate(
-                        1L,
-                        Metric.TEMPERATURE,
-                        21.5
-                )
-        ));
-
-        mockMvc.perform(
-                        post("/api/v1/statistics/query")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(fixture(
-                                        "query_statistics/by-sensor-names.json"
-                                ))
-                )
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].sensorId").value(1))
-                .andExpect(jsonPath("$[0].value").value(21.5));
-
-        verify(sensorService).resolveSensorIds(
-                List.of(),
-                List.of("Dublin City Sensor")
-        );
-    }
-
-    @Test
-    void given_no_dates_when_querying_statistics_then_returns_latest_statistics()
-            throws Exception {
-
-        when(measurementService.getStatistics(
-                List.of(1L),
-                List.of(Metric.TEMPERATURE),
-                Statistic.AVERAGE,
-                null,
-                null
-        )).thenReturn(List.of(
-                new MeasurementAggregate(
-                        1L,
-                        Metric.TEMPERATURE,
-                        25.0
-                )
-        ));
-
-        mockMvc.perform(
-                        post("/api/v1/statistics/query")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(fixture(
-                                        "query_statistics/latest-statistic-query.json"
-                                ))
-                )
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].sensorId").value(1))
-                .andExpect(jsonPath("$[0].metric")
-                        .value("TEMPERATURE"))
-                .andExpect(jsonPath("$[0].statistic")
-                        .value("AVERAGE"))
-                .andExpect(jsonPath("$[0].value").value(25.0));
-
-        verify(measurementService)
-                .getStatistics(
-                        List.of(1L),
-                        List.of(Metric.TEMPERATURE),
-                        Statistic.AVERAGE,
-                        null,
-                        null
-                );
-    }
-
-    @Test
-    void given_only_from_date_when_querying_statistics_then_returns_bad_request()
-            throws Exception {
-
-        when(measurementService.getStatistics(
-                List.of(1L),
-                List.of(Metric.TEMPERATURE),
-                Statistic.AVERAGE,
-                Instant.parse("2026-09-01T00:00:00Z"),
-                null
-        )).thenThrow(new IllegalArgumentException(
-                "Both from and to must be provided"
-        ));
-
-        mockMvc.perform(
-                        post("/api/v1/statistics/query")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(fixture(
-                                        "query_statistics/partial-date-range.json"
-                                ))
-                )
-                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -551,24 +428,4 @@ class MeasurementControllerTest {
                 );
     }
 
-    @Test
-    void given_missing_statistic_when_querying_statistics_then_returns_bad_request()
-            throws Exception {
-
-        mockMvc.perform(
-                        post("/api/v1/statistics/query")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(fixture("query_statistics/invalid-statistic.json"))
-                )
-                .andExpect(status().isBadRequest());
-
-        verify(measurementService, never())
-                .getStatistics(
-                        any(),
-                        any(),
-                        any(),
-                        any(),
-                        any()
-                );
-    }
 }

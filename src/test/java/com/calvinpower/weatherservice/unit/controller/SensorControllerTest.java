@@ -1,6 +1,7 @@
 package com.calvinpower.weatherservice.unit.controller;
 
 import com.calvinpower.weatherservice.controller.SensorController;
+import com.calvinpower.weatherservice.exception.DuplicateSensorNameException;
 import com.calvinpower.weatherservice.model.Sensor;
 import com.calvinpower.weatherservice.services.sensor.SensorService;
 import org.junit.jupiter.api.Test;
@@ -105,6 +106,49 @@ class SensorControllerTest {
 
         verify(sensorService)
                 .createSensor(null);
+    }
+
+    @Test
+    void given_duplicate_sensor_name_when_creating_sensor_then_returns_conflict()
+            throws Exception {
+        when(sensorService.createSensor("Dublin City Sensor"))
+                .thenThrow(new DuplicateSensorNameException(
+                        "Dublin City Sensor"
+                ));
+
+        mockMvc.perform(
+                        post("/api/v1/sensors")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(load(FIXTURE_ROOT + "named-sensor.json"))
+                )
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title")
+                        .value("Sensor already exists"))
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.detail").value(
+                        "A sensor named 'Dublin City Sensor' already exists"
+                ))
+                .andExpect(jsonPath("$.instance")
+                        .value("/api/v1/sensors"))
+                .andExpect(jsonPath("$.code")
+                        .value("DUPLICATE_SENSOR_NAME"));
+    }
+
+    @Test
+    void given_blank_sensor_name_when_creating_sensor_then_returns_validation_problem()
+            throws Exception {
+        mockMvc.perform(
+                        post("/api/v1/sensors")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(load(FIXTURE_ROOT + "blank-sensor.json"))
+                )
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("Invalid request"))
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.detail")
+                        .value("name must not be blank"))
+                .andExpect(jsonPath("$.code")
+                        .value("VALIDATION_FAILED"));
     }
 
 

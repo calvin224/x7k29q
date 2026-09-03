@@ -1,8 +1,10 @@
 package com.calvinpower.weatherservice.services.sensor;
 
+import com.calvinpower.weatherservice.exception.DuplicateSensorNameException;
 import com.calvinpower.weatherservice.exception.SensorNotFoundException;
 import com.calvinpower.weatherservice.model.Sensor;
 import com.calvinpower.weatherservice.repository.SensorRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 import java.util.Collection;
@@ -22,11 +24,23 @@ public class SensorServiceImpl implements SensorService {
 
     @Override
     public Sensor createSensor(String name) {
+        if (name != null && sensorRepository.existsByName(name)) {
+            throw new DuplicateSensorNameException(name);
+        }
+
         Sensor sensor = name == null
                 ? Sensor.create()
                 : Sensor.create(name);
 
-        return sensorRepository.save(sensor);
+        try {
+            return sensorRepository.saveAndFlush(sensor);
+        } catch (DataIntegrityViolationException exception) {
+            if (name != null) {
+                throw new DuplicateSensorNameException(name);
+            }
+
+            throw exception;
+        }
     }
 
     @Override
