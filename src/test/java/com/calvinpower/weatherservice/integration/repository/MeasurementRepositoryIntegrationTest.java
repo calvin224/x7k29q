@@ -9,15 +9,31 @@ import com.calvinpower.weatherservice.repository.SensorRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
+import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-@SpringBootTest
+@DataJpaTest(showSql = false)
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+@Testcontainers
 class MeasurementRepositoryIntegrationTest {
+
+    @Container
+    private static final PostgreSQLContainer postgres =
+            new PostgreSQLContainer("postgres:17")
+                    .withDatabaseName("weather")
+                    .withUsername("weather")
+                    .withPassword("weather");
 
     private final Instant from =
             Instant.parse("2026-09-01T00:00:00Z");
@@ -33,11 +49,15 @@ class MeasurementRepositoryIntegrationTest {
 
     private Sensor sensor;
 
+    @DynamicPropertySource
+    static void configureDatabase(DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", postgres::getJdbcUrl);
+        registry.add("spring.datasource.username", postgres::getUsername);
+        registry.add("spring.datasource.password", postgres::getPassword);
+    }
+
     @BeforeEach
     void setUp() {
-        measurementRepository.deleteAll();
-        sensorRepository.deleteAll();
-
         sensor = sensorRepository.save(new Sensor(null));
 
         measurementRepository.save(new Measurement(
@@ -319,5 +339,114 @@ class MeasurementRepositoryIntegrationTest {
                 .findFirst()
                 .orElseThrow()
                 .getValue());
+    }
+
+    @Test
+    void given_multiple_sensors_when_finding_average_without_sensor_filter_then_returns_average_per_sensor() {
+        Sensor secondSensor = sensorRepository.save(new Sensor(null));
+
+        measurementRepository.save(new Measurement(
+                secondSensor,
+                Metric.TEMPERATURE,
+                10.0,
+                Instant.parse("2026-09-01T10:00:00Z")
+        ));
+
+        measurementRepository.save(new Measurement(
+                secondSensor,
+                Metric.TEMPERATURE,
+                50.0,
+                Instant.parse("2026-09-01T11:00:00Z")
+        ));
+
+        List<MeasurementAggregate> results =
+                measurementRepository.findAverageByMetricsAndRecordedAtBetween(
+                        List.of(Metric.TEMPERATURE),
+                        from,
+                        to
+                );
+
+        assertEquals(2, results.size());
+
+        assertEquals(30.0, results.stream()
+                .filter(result ->
+                        result.sensorId().equals(sensor.getId()))
+                .findFirst()
+                .orElseThrow()
+                .value());
+
+        assertEquals(30.0, results.stream()
+                .filter(result ->
+                        result.sensorId().equals(secondSensor.getId()))
+                .findFirst()
+                .orElseThrow()
+                .value());
+    }
+
+    @Test
+    void given_specific_sensors_and_metrics_when_finding_latest_timestamp_then_ignores_unrelated_data() {
+        Sensor secondSensor = sensorRepository.save(new Sensor(null));
+        Sensor unrelatedSensor = sensorRepository.save(new Sensor(null));
+
+        measurementRepository.save(new Measurement(
+                secondSensor,
+                Metric.TEMPERATURE,
+                25.0,
+                Instant.parse("2026-09-01T13:00:00Z")
+        ));
+
+        measurementRepository.save(new Measurement(
+                secondSensor,
+                Metric.HUMIDITY,
+                70.0,
+                Instant.parse("2026-09-01T15:00:00Z")
+        ));
+
+        measurementRepository.save(new Measurement(
+                unrelatedSensor,
+                Metric.TEMPERATURE,
+                30.0,
+                Instant.parse("2026-09-01T16:00:00Z")
+        ));
+
+        Optional<Instant> result = measurementRepository
+                .findLatestRecordedAtBySensorIdsAndMetrics(
+                        List.of(sensor.getId(), secondSensor.getId()),
+                        List.of(Metric.TEMPERATURE)
+                );
+
+        assertEquals(
+                Optional.of(Instant.parse("2026-09-01T13:00:00Z")),
+                result
+        );
+    }
+
+    @Test
+    void given_all_sensors_and_requested_metrics_when_finding_latest_timestamp_then_ignores_unrelated_metrics() {
+        Sensor secondSensor = sensorRepository.save(new Sensor(null));
+
+        measurementRepository.save(new Measurement(
+                secondSensor,
+                Metric.TEMPERATURE,
+                25.0,
+                Instant.parse("2026-09-01T14:00:00Z")
+        ));
+
+        measurementRepository.save(new Measurement(
+                secondSensor,
+                Metric.HUMIDITY,
+                70.0,
+                Instant.parse("2026-09-01T16:00:00Z")
+        ));
+
+        Optional<Instant> result = measurementRepository
+                .findLatestRecordedAtByMetrics(
+                        List.of(Metric.TEMPERATURE)
+                );
+
+        assertEquals(
+                Optional.of(Instant.parse("2026-09-01T14:00:00Z")),
+                result
+        );
     }
 }

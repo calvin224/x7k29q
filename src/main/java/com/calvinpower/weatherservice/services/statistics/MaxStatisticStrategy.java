@@ -15,7 +15,9 @@ public class MaxStatisticStrategy implements StatisticStrategy {
 
     private final MeasurementRepository measurementRepository;
 
-    public MaxStatisticStrategy(MeasurementRepository measurementRepository) {
+    public MaxStatisticStrategy(
+            MeasurementRepository measurementRepository
+    ) {
         this.measurementRepository = measurementRepository;
     }
 
@@ -31,6 +33,15 @@ public class MaxStatisticStrategy implements StatisticStrategy {
             Instant from,
             Instant to
     ) {
+        if (sensorIds.isEmpty()) {
+            return measurementRepository
+                    .findMaxByMetricsAndRecordedAtBetween(
+                            metrics,
+                            from,
+                            to
+                    );
+        }
+
         return measurementRepository
                 .findMaxBySensorsAndMetricsAndRecordedAtBetween(
                         sensorIds,

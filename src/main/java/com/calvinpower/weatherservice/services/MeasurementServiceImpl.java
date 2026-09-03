@@ -13,9 +13,14 @@ import com.calvinpower.weatherservice.services.statistics.StatisticStrategyFacto
 import com.calvinpower.weatherservice.services.validation.DateRangeValidator;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 
 @Service
 public class MeasurementServiceImpl implements MeasurementService {
@@ -67,6 +72,7 @@ public class MeasurementServiceImpl implements MeasurementService {
             Instant to
     ) {
         dateRangeValidator.validate(from, to);
+        validateSensorsExist(sensorIds);
 
         if (sensorIds.isEmpty()) {
             if (from == null && to == null) {
@@ -108,6 +114,26 @@ public class MeasurementServiceImpl implements MeasurementService {
             Instant to
     ) {
         dateRangeValidator.validate(from, to);
+        validateSensorsExist(sensorIds);
+
+        Instant effectiveFrom = from;
+        Instant effectiveTo = to;
+
+        if (from == null && to == null) {
+            Optional<Instant> latestRecordedAt = sensorIds.isEmpty()
+                    ? measurementRepository.findLatestRecordedAtByMetrics(metrics)
+                    : measurementRepository.findLatestRecordedAtBySensorIdsAndMetrics(
+                            sensorIds,
+                            metrics
+                    );
+
+            if (latestRecordedAt.isEmpty()) {
+                return List.of();
+            }
+
+            effectiveTo = latestRecordedAt.get();
+            effectiveFrom = effectiveTo.minus(Duration.ofDays(1));
+        }
 
         StatisticStrategy strategy =
                 statisticStrategyFactory.getStrategy(statistic);
@@ -115,8 +141,27 @@ public class MeasurementServiceImpl implements MeasurementService {
         return strategy.calculate(
                 sensorIds,
                 metrics,
-                from,
-                to
+                effectiveFrom,
+                effectiveTo
         );
+    }
+
+    private void validateSensorsExist(Collection<Long> sensorIds) {
+        if (sensorIds.isEmpty()) {
+            return;
+        }
+
+        Set<Long> requestedSensorIds = new LinkedHashSet<>(sensorIds);
+        Set<Long> existingSensorIds = new HashSet<>();
+
+        sensorRepository.findAllById(requestedSensorIds)
+                .forEach(sensor -> existingSensorIds.add(sensor.getId()));
+
+        requestedSensorIds.stream()
+                .filter(sensorId -> !existingSensorIds.contains(sensorId))
+                .findFirst()
+                .ifPresent(sensorId -> {
+                    throw new SensorNotFoundException(sensorId);
+                });
     }
 }

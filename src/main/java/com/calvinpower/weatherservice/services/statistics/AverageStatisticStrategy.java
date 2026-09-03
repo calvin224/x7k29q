@@ -15,7 +15,9 @@ public class AverageStatisticStrategy implements StatisticStrategy {
 
     private final MeasurementRepository measurementRepository;
 
-    public AverageStatisticStrategy(MeasurementRepository measurementRepository) {
+    public AverageStatisticStrategy(
+            MeasurementRepository measurementRepository
+    ) {
         this.measurementRepository = measurementRepository;
     }
 
@@ -31,6 +33,15 @@ public class AverageStatisticStrategy implements StatisticStrategy {
             Instant from,
             Instant to
     ) {
+        if (sensorIds.isEmpty()) {
+            return measurementRepository
+                    .findAverageByMetricsAndRecordedAtBetween(
+                            metrics,
+                            from,
+                            to
+                    );
+        }
+
         return measurementRepository
                 .findAverageBySensorsAndMetricsAndRecordedAtBetween(
                         sensorIds,

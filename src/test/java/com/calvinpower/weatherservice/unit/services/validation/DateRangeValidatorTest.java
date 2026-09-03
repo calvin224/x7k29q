@@ -114,4 +114,17 @@ class DateRangeValidatorTest {
                 () -> validator.validate(from, to)
         );
     }
+
+    @Test
+    void given_from_after_to_when_validating_then_throws_exception() {
+        Instant from =
+                Instant.parse("2026-09-07T00:00:00Z");
+        Instant to =
+                Instant.parse("2026-09-01T00:00:00Z");
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> validator.validate(from, to)
+        );
+    }
 }

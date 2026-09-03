@@ -1,12 +1,11 @@
 {
+  "allSensors": false,
   "sensorIds": [
-    1,
-    2
+    1
   ],
   "metrics": [
-    "TEMPERATURE",
-    "HUMIDITY"
+    "TEMPERATURE"
   ],
   "from": "2026-09-01T00:00:00Z",
-  "to": "2026-09-07T00:00:00Z"
+  "to": "2026-09-02T00:00:00Z"
 }

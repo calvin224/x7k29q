@@ -1,6 +1,9 @@
 {
   "allSensors": false,
-  "sensorIds": null,
+  "sensorIds": [],
+  "sensorNames": [
+    "Dublin City Sensor"
+  ],
   "metrics": [
     "TEMPERATURE"
   ],

@@ -15,6 +15,7 @@ import com.calvinpower.weatherservice.services.validation.DateRangeValidator;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 
@@ -109,12 +110,15 @@ class MeasurementServiceImplTest {
     }
 
     @Test
-    void given_measurement_query_when_getting_measurements_then_returns_repository_results() {
+    void given_existing_sensor_when_getting_measurements_with_no_matching_data_then_returns_empty_result() {
         Instant from = Instant.parse("2026-09-01T00:00:00Z");
         Instant to = Instant.parse("2026-09-02T00:00:00Z");
 
         List<Long> sensorIds = List.of(1L);
         List<Metric> metrics = List.of(Metric.TEMPERATURE);
+
+        when(sensorRepository.findAllById(new LinkedHashSet<>(sensorIds)))
+                .thenReturn(List.of(new Sensor(1L)));
 
         when(measurementRepository
                 .findBySensor_IdInAndMetricInAndRecordedAtBetween(
@@ -144,6 +148,73 @@ class MeasurementServiceImplTest {
     }
 
     @Test
+    void given_missing_sensor_when_getting_measurements_then_throws_sensor_not_found_exception() {
+        List<Long> sensorIds = List.of(999L);
+
+        when(sensorRepository.findAllById(new LinkedHashSet<>(sensorIds)))
+                .thenReturn(List.of());
+
+        assertThrows(
+                SensorNotFoundException.class,
+                () -> measurementService.getMeasurements(
+                        sensorIds,
+                        List.of(Metric.TEMPERATURE),
+                        Instant.parse("2026-09-01T00:00:00Z"),
+                        Instant.parse("2026-09-02T00:00:00Z")
+                )
+        );
+
+        verifyNoInteractions(measurementRepository);
+    }
+
+    @Test
+    void given_existing_and_missing_sensor_ids_when_getting_measurements_then_throws_sensor_not_found_exception() {
+        List<Long> sensorIds = List.of(1L, 999L);
+
+        when(sensorRepository.findAllById(new LinkedHashSet<>(sensorIds)))
+                .thenReturn(List.of(new Sensor(1L)));
+
+        assertThrows(
+                SensorNotFoundException.class,
+                () -> measurementService.getMeasurements(
+                        sensorIds,
+                        List.of(Metric.TEMPERATURE),
+                        Instant.parse("2026-09-01T00:00:00Z"),
+                        Instant.parse("2026-09-02T00:00:00Z")
+                )
+        );
+
+        verifyNoInteractions(measurementRepository);
+    }
+
+    @Test
+    void given_duplicate_existing_sensor_ids_when_getting_measurements_then_does_not_report_missing_sensor() {
+        List<Long> sensorIds = List.of(1L, 1L);
+        List<Metric> metrics = List.of(Metric.TEMPERATURE);
+        Instant from = Instant.parse("2026-09-01T00:00:00Z");
+        Instant to = Instant.parse("2026-09-02T00:00:00Z");
+
+        when(sensorRepository.findAllById(new LinkedHashSet<>(sensorIds)))
+                .thenReturn(List.of(new Sensor(1L)));
+        when(measurementRepository
+                .findBySensor_IdInAndMetricInAndRecordedAtBetween(
+                        sensorIds,
+                        metrics,
+                        from,
+                        to
+                )).thenReturn(List.of());
+
+        List<Measurement> result = measurementService.getMeasurements(
+                sensorIds,
+                metrics,
+                from,
+                to
+        );
+
+        assertEquals(List.of(), result);
+    }
+
+    @Test
     void given_statistic_query_when_getting_statistics_then_uses_selected_strategy() {
         Instant from = Instant.parse("2026-09-01T00:00:00Z");
         Instant to = Instant.parse("2026-09-02T00:00:00Z");
@@ -160,6 +231,9 @@ class MeasurementServiceImplTest {
                         21.5
                 )
         );
+
+        when(sensorRepository.findAllById(new LinkedHashSet<>(sensorIds)))
+                .thenReturn(List.of(new Sensor(1L)));
 
         when(statisticStrategyFactory.getStrategy(Statistic.AVERAGE))
                 .thenReturn(strategy);
@@ -191,6 +265,160 @@ class MeasurementServiceImplTest {
                         from,
                         to
                 );
+    }
+
+    @Test
+    void given_missing_sensor_when_getting_statistics_then_throws_sensor_not_found_exception() {
+        List<Long> sensorIds = List.of(999L);
+
+        when(sensorRepository.findAllById(new LinkedHashSet<>(sensorIds)))
+                .thenReturn(List.of());
+
+        assertThrows(
+                SensorNotFoundException.class,
+                () -> measurementService.getStatistics(
+                        sensorIds,
+                        List.of(Metric.TEMPERATURE),
+                        Statistic.AVERAGE,
+                        Instant.parse("2026-09-01T00:00:00Z"),
+                        Instant.parse("2026-09-02T00:00:00Z")
+                )
+        );
+
+        verifyNoInteractions(measurementRepository);
+        verifyNoInteractions(statisticStrategyFactory);
+    }
+
+    @Test
+    void given_no_dates_for_specific_sensors_when_getting_statistics_then_uses_latest_one_day_range() {
+        List<Long> sensorIds = List.of(1L, 2L);
+        List<Metric> metrics = List.of(Metric.TEMPERATURE);
+        Instant latestRecordedAt = Instant.parse("2026-09-02T12:00:00Z");
+        Instant expectedFrom = Instant.parse("2026-09-01T12:00:00Z");
+        StatisticStrategy strategy = mock(StatisticStrategy.class);
+
+        List<MeasurementAggregate> expected = List.of(
+                new MeasurementAggregate(
+                        1L,
+                        Metric.TEMPERATURE,
+                        25.0
+                )
+        );
+
+        when(sensorRepository.findAllById(new LinkedHashSet<>(sensorIds)))
+                .thenReturn(List.of(new Sensor(1L), new Sensor(2L)));
+
+        when(measurementRepository.findLatestRecordedAtBySensorIdsAndMetrics(
+                sensorIds,
+                metrics
+        )).thenReturn(Optional.of(latestRecordedAt));
+
+        when(statisticStrategyFactory.getStrategy(Statistic.AVERAGE))
+                .thenReturn(strategy);
+
+        when(strategy.calculate(
+                sensorIds,
+                metrics,
+                expectedFrom,
+                latestRecordedAt
+        )).thenReturn(expected);
+
+        List<MeasurementAggregate> result = measurementService.getStatistics(
+                sensorIds,
+                metrics,
+                Statistic.AVERAGE,
+                null,
+                null
+        );
+
+        assertEquals(expected, result);
+
+        verify(measurementRepository)
+                .findLatestRecordedAtBySensorIdsAndMetrics(
+                        sensorIds,
+                        metrics
+                );
+
+        verify(strategy).calculate(
+                sensorIds,
+                metrics,
+                expectedFrom,
+                latestRecordedAt
+        );
+    }
+
+    @Test
+    void given_no_dates_for_all_sensors_when_getting_statistics_then_uses_latest_one_day_range() {
+        List<Long> sensorIds = List.of();
+        List<Metric> metrics = List.of(Metric.TEMPERATURE, Metric.HUMIDITY);
+        Instant latestRecordedAt = Instant.parse("2026-09-02T12:00:00Z");
+        Instant expectedFrom = Instant.parse("2026-09-01T12:00:00Z");
+        StatisticStrategy strategy = mock(StatisticStrategy.class);
+
+        when(measurementRepository.findLatestRecordedAtByMetrics(metrics))
+                .thenReturn(Optional.of(latestRecordedAt));
+
+        when(statisticStrategyFactory.getStrategy(Statistic.MAX))
+                .thenReturn(strategy);
+
+        when(strategy.calculate(
+                sensorIds,
+                metrics,
+                expectedFrom,
+                latestRecordedAt
+        )).thenReturn(List.of());
+
+        List<MeasurementAggregate> result = measurementService.getStatistics(
+                sensorIds,
+                metrics,
+                Statistic.MAX,
+                null,
+                null
+        );
+
+        assertEquals(List.of(), result);
+
+        verify(measurementRepository)
+                .findLatestRecordedAtByMetrics(metrics);
+
+        verify(strategy).calculate(
+                sensorIds,
+                metrics,
+                expectedFrom,
+                latestRecordedAt
+        );
+    }
+
+    @Test
+    void given_no_matching_measurements_when_getting_latest_statistics_then_returns_empty_result() {
+        List<Long> sensorIds = List.of(1L);
+        List<Metric> metrics = List.of(Metric.TEMPERATURE);
+
+        when(sensorRepository.findAllById(new LinkedHashSet<>(sensorIds)))
+                .thenReturn(List.of(new Sensor(1L)));
+
+        when(measurementRepository.findLatestRecordedAtBySensorIdsAndMetrics(
+                sensorIds,
+                metrics
+        )).thenReturn(Optional.empty());
+
+        List<MeasurementAggregate> result = measurementService.getStatistics(
+                sensorIds,
+                metrics,
+                Statistic.SUM,
+                null,
+                null
+        );
+
+        assertEquals(List.of(), result);
+
+        verify(measurementRepository)
+                .findLatestRecordedAtBySensorIdsAndMetrics(
+                        sensorIds,
+                        metrics
+                );
+
+        verifyNoInteractions(statisticStrategyFactory);
     }
 
     @Test
@@ -258,6 +486,9 @@ class MeasurementServiceImplTest {
 
         List<Measurement> expected = List.of(latestMeasurement);
 
+        when(sensorRepository.findAllById(new LinkedHashSet<>(sensorIds)))
+                .thenReturn(List.of(sensor));
+
         when(measurementRepository.findLatestBySensorIdsAndMetrics(
                 sensorIds,
                 metrics
@@ -289,7 +520,7 @@ class MeasurementServiceImplTest {
     }
 
     @Test
-    void given_empty_sensor_ids_when_getting_measurements_then_returns_measurements_from_all_sensors() {
+    void given_all_sensors_when_getting_measurements_then_does_not_validate_specific_sensor_ids() {
         List<Long> sensorIds = List.of();
         List<Metric> metrics = List.of(Metric.TEMPERATURE);
 
@@ -332,6 +563,9 @@ class MeasurementServiceImplTest {
 
         assertEquals(expected, result);
 
+        verify(sensorRepository, never())
+                .findAllById(anyCollection());
+
         verify(measurementRepository)
                 .findByMetricsAndRecordedAtBetween(
                         metrics,
@@ -347,4 +581,6 @@ class MeasurementServiceImplTest {
                         any(Instant.class)
                 );
     }
+
+
 }
