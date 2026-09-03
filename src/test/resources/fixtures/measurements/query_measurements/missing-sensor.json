@@ -1,6 +1,8 @@
 {
   "allSensors": false,
-  "sensorIds": null,
+  "sensorIds": [
+    999
+  ],
   "metrics": [
     "TEMPERATURE"
   ],

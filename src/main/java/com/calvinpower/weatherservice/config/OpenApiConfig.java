@@ -15,7 +15,14 @@ public class OpenApiConfig {
         return new OpenAPI()
                 .info(new Info()
                         .title("Weather Service API")
-                        .description("REST API for ingesting and querying weather sensor measurements.")
+                        .description("""
+                                Register weather sensors, record their measurements, query raw readings,
+                                and calculate statistics over a selected time range.
+
+                                Query endpoints accept sensor IDs, exact sensor names, and metric filters
+                                in a JSON request body. Set `allSensors` to `true` with empty `sensorIds`
+                                and `sensorNames` arrays to include every sensor.
+                                """)
                         .version("v1.0.0")
                         .contact(new Contact()
                                 .name("Calvin Power")

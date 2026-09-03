@@ -15,7 +15,9 @@ public class SumStatisticStrategy implements StatisticStrategy {
 
     private final MeasurementRepository measurementRepository;
 
-    public SumStatisticStrategy(MeasurementRepository measurementRepository) {
+    public SumStatisticStrategy(
+            MeasurementRepository measurementRepository
+    ) {
         this.measurementRepository = measurementRepository;
     }
 
@@ -31,6 +33,15 @@ public class SumStatisticStrategy implements StatisticStrategy {
             Instant from,
             Instant to
     ) {
+        if (sensorIds.isEmpty()) {
+            return measurementRepository
+                    .findSumByMetricsAndRecordedAtBetween(
+                            metrics,
+                            from,
+                            to
+                    );
+        }
+
         return measurementRepository
                 .findSumBySensorsAndMetricsAndRecordedAtBetween(
                         sensorIds,

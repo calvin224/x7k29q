@@ -15,7 +15,9 @@ public class MinStatisticStrategy implements StatisticStrategy {
 
     private final MeasurementRepository measurementRepository;
 
-    public MinStatisticStrategy(MeasurementRepository measurementRepository) {
+    public MinStatisticStrategy(
+            MeasurementRepository measurementRepository
+    ) {
         this.measurementRepository = measurementRepository;
     }
 
@@ -31,6 +33,15 @@ public class MinStatisticStrategy implements StatisticStrategy {
             Instant from,
             Instant to
     ) {
+        if (sensorIds.isEmpty()) {
+            return measurementRepository
+                    .findMinByMetricsAndRecordedAtBetween(
+                            metrics,
+                            from,
+                            to
+                    );
+        }
+
         return measurementRepository
                 .findMinBySensorsAndMetricsAndRecordedAtBetween(
                         sensorIds,
