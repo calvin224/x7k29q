@@ -1,0 +1,39 @@
+services:
+  - type: web
+    name: weather-service-api
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./docker/Dockerfile
+    dockerContext: .
+    healthCheckPath: /v3/api-docs
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: DATABASE_HOST
+        fromDatabase:
+          name: weather-service-db
+          property: host
+      - key: DATABASE_PORT
+        fromDatabase:
+          name: weather-service-db
+          property: port
+      - key: DATABASE_NAME
+        fromDatabase:
+          name: weather-service-db
+          property: database
+      - key: DATABASE_USER
+        fromDatabase:
+          name: weather-service-db
+          property: user
+      - key: DATABASE_PASSWORD
+        fromDatabase:
+          name: weather-service-db
+          property: password
+
+databases:
+  - name: weather-service-db
+    plan: free
+    region: frankfurt
+    postgresMajorVersion: "17"
+    databaseName: weather_qo9n
+    user: weather
