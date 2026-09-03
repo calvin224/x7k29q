@@ -13,7 +13,9 @@ The application and PostgreSQL database run on Render's free tier. The web servi
 ## Requirements
 
 - Java 25
-- Docker
+- Docker with Docker Compose
+
+The Maven wrapper is included, so a separate Maven installation is not required.
 
 ## Run Locally
 
@@ -35,6 +37,8 @@ Run the Spring Boot application:
 ```bash
 ./mvnw spring-boot:run
 ```
+
+On Windows PowerShell, use `.\mvnw.cmd spring-boot:run` instead.
 
 The local application uses the database defaults defined in `application.yaml`:
 
@@ -59,6 +63,24 @@ docker compose -f docker/docker-compose.yaml down
 ```
 
 Add `-v` only when you also want to delete the local PostgreSQL volume and its data.
+
+## OpenHop Architecture Diagram
+
+[OpenHop](https://github.com/naorsabag/openhop) is a local interactive data-flow viewer. It renders the provided `docs/openhop/weather-service-architecture.yaml` file as a diagram that can be played, paused, and stepped through one hop at a time.
+
+OpenHop requires Node.js and `npx`. From the repository root, start the server:
+
+```bash
+npx openhop serve
+```
+
+In a second terminal, push the provided YAML:
+
+```bash
+npx openhop push docs/openhop/weather-service-architecture.yaml --json
+```
+
+Open the `url` returned by the command, then use the viewer controls to explore the architecture flow. OpenHop is optional and is not required to run the weather service.
 
 ## Deployment
 
@@ -98,6 +120,36 @@ If a required GitHub Actions check fails, Render does not automatically deploy t
 | `POST` | `/api/v1/statistics/query` | Calculate MIN, MAX, SUM, or AVERAGE |
 
 Swagger groups these endpoints under `Sensors`, `Measurements`, and `Statistics` respectively.
+
+### Using Swagger UI and OpenAPI
+
+[OpenAPI](https://www.openapis.org/) is a machine-readable description of the API's endpoints, parameters, request bodies, responses, and status codes. Springdoc generates this document from the application code at runtime. Swagger UI reads the document and provides interactive browser documentation, allowing the API to be explored without installing a separate client.
+
+To call an endpoint through Swagger UI:
+
+1. Start the application locally, or open the live Swagger UI linked above.
+2. Expand an endpoint under `Sensors`, `Measurements`, or `Statistics`.
+3. Select **Try it out**.
+4. Enter any path parameters and edit the example JSON body.
+5. Select **Execute** to view the generated `curl` command, request URL, response status, headers, and body.
+
+For example, `POST /api/v1/sensors` accepts a named sensor:
+
+```json
+{
+  "name": "Dublin City Sensor"
+}
+```
+
+Send `{}` to create an unnamed sensor. A whitespace-only name such as `{ "name": "   " }` is rejected with `400 Bad Request` and the error code `VALIDATION_FAILED`.
+
+The raw JSON specification is available from `/v3/api-docs`. It can be imported into Postman or Insomnia, or used to generate an API client. To save the local specification:
+
+```bash
+curl http://localhost:8080/v3/api-docs --output openapi.json
+```
+
+The local application must be running to use these local URLs. The API and its documentation endpoints do not require authentication.
 
 ## Sensor Creation
 
@@ -157,3 +209,5 @@ Docker must be running because repository integration tests use an isolated Post
 ```bash
 ./mvnw clean test
 ```
+
+On Windows PowerShell, use `.\mvnw.cmd clean test` instead.
