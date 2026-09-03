@@ -3,9 +3,9 @@ spring:
     name: weather-service
 
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/weather}
-    username: ${SPRING_DATASOURCE_USERNAME:weather}
-    password: ${SPRING_DATASOURCE_PASSWORD:weather}
+    url: jdbc:postgresql://${DATABASE_HOST:localhost}:${DATABASE_PORT:5432}/${DATABASE_NAME:weather}
+    username: ${DATABASE_USER:weather}
+    password: ${DATABASE_PASSWORD:weather}
 
   jpa:
     hibernate:
@@ -15,3 +15,6 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+
+server:
+  port: ${PORT:8080}
