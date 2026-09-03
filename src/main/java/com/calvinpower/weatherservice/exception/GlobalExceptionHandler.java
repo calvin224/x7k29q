@@ -19,6 +19,8 @@ import java.util.stream.Collectors;
 @Hidden
 public class GlobalExceptionHandler {
 
+    private static final String INVALID_REQUEST_TITLE = "Invalid request";
+
     @ExceptionHandler(SensorNotFoundException.class)
     public ResponseEntity<ProblemDetail> handleSensorNotFound(
             SensorNotFoundException exception,
@@ -95,7 +97,7 @@ public class GlobalExceptionHandler {
                 HttpStatus.BAD_REQUEST,
                 invalidSensorSelection
                         ? "Invalid sensor selection"
-                        : "Invalid request",
+                        : INVALID_REQUEST_TITLE,
                 detail,
                 invalidSensorSelection
                         ? "INVALID_SENSOR_SELECTION"
@@ -110,7 +112,7 @@ public class GlobalExceptionHandler {
     ) {
         return problem(
                 HttpStatus.BAD_REQUEST,
-                "Invalid request",
+                INVALID_REQUEST_TITLE,
                 "Request body is missing or contains invalid JSON",
                 "VALIDATION_FAILED",
                 request
@@ -124,7 +126,7 @@ public class GlobalExceptionHandler {
     ) {
         return problem(
                 HttpStatus.BAD_REQUEST,
-                "Invalid request",
+                INVALID_REQUEST_TITLE,
                 exception.getMessage(),
                 "VALIDATION_FAILED",
                 request
