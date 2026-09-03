@@ -9,6 +9,8 @@ import java.util.Optional;
 
 public interface SensorRepository extends JpaRepository<Sensor, Long> {
 
+    boolean existsByName(String name);
+
     List<Sensor> findAllByNameIn(Collection<String> names);
 
     Optional<Sensor> findByName(String name);

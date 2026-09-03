@@ -1,0 +1,8 @@
+{
+  "allSensors": true,
+  "sensorIds": [1],
+  "sensorNames": [],
+  "metrics": ["TEMPERATURE"],
+  "from": "2026-09-01T00:00:00Z",
+  "to": "2026-09-02T00:00:00Z"
+}

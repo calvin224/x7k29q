@@ -3,10 +3,10 @@ package com.calvinpower.weatherservice.exception;
 public class SensorNotFoundException extends RuntimeException {
 
     public SensorNotFoundException(Long sensorId) {
-        super("Sensor not found: " + sensorId);
+        super("Sensor " + sensorId + " does not exist");
     }
 
     public SensorNotFoundException(String sensorName) {
-        super("Sensor not found: " + sensorName);
+        super("Sensor named '" + sensorName + "' does not exist");
     }
 }

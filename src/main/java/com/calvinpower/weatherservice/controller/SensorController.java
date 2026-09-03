@@ -1,5 +1,6 @@
 package com.calvinpower.weatherservice.controller;
 
+import com.calvinpower.weatherservice.dto.ApiProblemResponse;
 import com.calvinpower.weatherservice.dto.CreateSensorRequest;
 import com.calvinpower.weatherservice.dto.SensorResponse;
 import com.calvinpower.weatherservice.model.Sensor;
@@ -7,6 +8,7 @@ import com.calvinpower.weatherservice.services.sensor.SensorService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -83,7 +85,30 @@ public class SensorController {
             @ApiResponse(
                     responseCode = "400",
                     description = "Invalid sensor name",
-                    content = @Content
+                    content = @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ApiProblemResponse.class)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "409",
+                    description = "A sensor with the requested name already exists",
+                    content = @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ApiProblemResponse.class),
+                            examples = @ExampleObject(
+                                    name = "Duplicate sensor name",
+                                    value = """
+                                            {
+                                              "title": "Sensor already exists",
+                                              "status": 409,
+                                              "detail": "A sensor named 'Dublin Sensor' already exists",
+                                              "instance": "/api/v1/sensors",
+                                              "code": "DUPLICATE_SENSOR_NAME"
+                                            }
+                                            """
+                            )
+                    )
             )
     })
     public ResponseEntity<SensorResponse> createSensor(

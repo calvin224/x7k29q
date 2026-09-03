@@ -3,7 +3,6 @@ package com.calvinpower.weatherservice.controller;
 import com.calvinpower.weatherservice.dto.*;
 import com.calvinpower.weatherservice.model.Measurement;
 import com.calvinpower.weatherservice.model.Sensor;
-import com.calvinpower.weatherservice.repository.MeasurementAggregate;
 import com.calvinpower.weatherservice.services.MeasurementService;
 import com.calvinpower.weatherservice.services.sensor.SensorService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -58,12 +57,18 @@ public class MeasurementController {
             @ApiResponse(
                     responseCode = "400",
                     description = "Invalid measurement payload",
-                    content = @Content
+                    content = @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ApiProblemResponse.class)
+                    )
             ),
             @ApiResponse(
                     responseCode = "404",
                     description = "Sensor not found",
-                    content = @Content
+                    content = @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ApiProblemResponse.class)
+                    )
             )
     })
     public ResponseEntity<MeasurementResponse> createMeasurement(
@@ -98,12 +103,18 @@ public class MeasurementController {
             @ApiResponse(
                     responseCode = "400",
                     description = "Invalid measurement payload",
-                    content = @Content
+                    content = @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ApiProblemResponse.class)
+                    )
             ),
             @ApiResponse(
                     responseCode = "404",
                     description = "Sensor name not found",
-                    content = @Content
+                    content = @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ApiProblemResponse.class)
+                    )
             )
     })
     public ResponseEntity<MeasurementResponse> createMeasurementBySensorName(
@@ -169,12 +180,18 @@ public class MeasurementController {
             @ApiResponse(
                     responseCode = "400",
                     description = "Invalid filters or date range",
-                    content = @Content
+                    content = @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ApiProblemResponse.class)
+                    )
             ),
             @ApiResponse(
                     responseCode = "404",
                     description = "A requested sensor ID or name was not found",
-                    content = @Content
+                    content = @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ApiProblemResponse.class)
+                    )
             )
     })
     public ResponseEntity<List<MeasurementQueryResponse>> queryMeasurements(
@@ -203,75 +220,6 @@ public class MeasurementController {
                         measurement.getMetric(),
                         measurement.getValue(),
                         measurement.getRecordedAt()
-                ))
-                .toList();
-
-        return ResponseEntity.ok(response);
-    }
-
-    @PostMapping("/statistics/query")
-    @Tag(
-            name = "Statistics",
-            description = "Calculate aggregate values from recorded measurements."
-    )
-    @Operation(
-            summary = "Calculate measurement statistics",
-            description = """
-                    Calculates MIN, MAX, SUM, or AVERAGE for each matching sensor and metric.
-                    An explicit range must span at least one day and no more than one calendar month.
-                    When both dates are omitted, the newest matching measurement becomes the end of
-                    an implicit one-day range.
-                    """
-    )
-    @ApiResponses({
-            @ApiResponse(
-                    responseCode = "200",
-                    description = "Calculated statistics grouped by sensor and metric",
-                    content = @Content(
-                            mediaType = MediaType.APPLICATION_JSON_VALUE,
-                            array = @ArraySchema(
-                                    schema = @Schema(implementation = StatisticResponse.class)
-                            )
-                    )
-            ),
-            @ApiResponse(
-                    responseCode = "400",
-                    description = "Invalid filters, statistic, or date range",
-                    content = @Content
-            ),
-            @ApiResponse(
-                    responseCode = "404",
-                    description = "A requested sensor ID or name was not found",
-                    content = @Content
-            )
-    })
-    public ResponseEntity<List<StatisticResponse>> queryStatistics(
-            @io.swagger.v3.oas.annotations.parameters.RequestBody(
-                    description = "Sensor and metric filters, statistic, and optional date range.",
-                    required = true
-            )
-            @Valid @RequestBody StatisticQuery query
-    ) {
-        List<Long> sensorIds = resolveSensorIds(
-                query.sensorIds(),
-                query.sensorNames()
-        );
-
-        List<MeasurementAggregate> aggregates =
-                measurementService.getStatistics(
-                        sensorIds,
-                        query.metrics(),
-                        query.statistic(),
-                        query.from(),
-                        query.to()
-                );
-
-        List<StatisticResponse> response = aggregates.stream()
-                .map(aggregate -> new StatisticResponse(
-                        aggregate.sensorId(),
-                        aggregate.metric(),
-                        query.statistic(),
-                        aggregate.value()
                 ))
                 .toList();
 

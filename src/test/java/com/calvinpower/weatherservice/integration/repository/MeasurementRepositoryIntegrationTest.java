@@ -1,16 +1,19 @@
 package com.calvinpower.weatherservice.integration.repository;
 
+import com.calvinpower.weatherservice.exception.DuplicateSensorNameException;
 import com.calvinpower.weatherservice.model.Measurement;
 import com.calvinpower.weatherservice.model.Metric;
 import com.calvinpower.weatherservice.model.Sensor;
 import com.calvinpower.weatherservice.repository.MeasurementAggregate;
 import com.calvinpower.weatherservice.repository.MeasurementRepository;
 import com.calvinpower.weatherservice.repository.SensorRepository;
+import com.calvinpower.weatherservice.services.sensor.SensorServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.junit.jupiter.Container;
@@ -22,6 +25,8 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @DataJpaTest(showSql = false)
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -448,5 +453,47 @@ class MeasurementRepositoryIntegrationTest {
                 Optional.of(Instant.parse("2026-09-01T14:00:00Z")),
                 result
         );
+    }
+
+    @Test
+    void given_duplicate_sensor_name_when_flushing_then_database_rejects_duplicate() {
+        sensorRepository.saveAndFlush(
+                new Sensor(null, "Dublin City Sensor")
+        );
+
+        assertThrows(
+                DataIntegrityViolationException.class,
+                () -> sensorRepository.saveAndFlush(
+                        new Sensor(null, "Dublin City Sensor")
+                )
+        );
+    }
+
+    @Test
+    void given_existing_sensor_name_when_creating_sensor_then_service_reports_duplicate() {
+        SensorServiceImpl sensorService =
+                new SensorServiceImpl(sensorRepository);
+
+        Sensor createdSensor =
+                sensorService.createSensor("Dublin City Sensor");
+
+        assertNotNull(createdSensor.getId());
+        assertThrows(
+                DuplicateSensorNameException.class,
+                () -> sensorService.createSensor("Dublin City Sensor")
+        );
+    }
+
+    @Test
+    void given_multiple_unnamed_sensors_when_flushing_then_database_accepts_each_sensor() {
+        Sensor firstSensor = sensorRepository.saveAndFlush(
+                new Sensor(null)
+        );
+        Sensor secondSensor = sensorRepository.saveAndFlush(
+                new Sensor(null)
+        );
+
+        assertNotNull(firstSensor.getId());
+        assertNotNull(secondSensor.getId());
     }
 }
