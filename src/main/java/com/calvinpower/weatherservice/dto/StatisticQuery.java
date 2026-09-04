@@ -2,12 +2,9 @@ package com.calvinpower.weatherservice.dto;
 
 import com.calvinpower.weatherservice.model.Metric;
 import com.calvinpower.weatherservice.model.Statistic;
+import com.calvinpower.weatherservice.services.validation.DateRangeValidator;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.AssertTrue;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotEmpty;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.*;
 
 import java.time.Instant;
 import java.util.List;
@@ -64,29 +61,23 @@ public record StatisticQuery(
         Instant to
 ) {
 
-    @AssertTrue(message = "When allSensors is true, sensorIds and sensorNames must be empty")
+    @AssertTrue(message = DateRangeValidator.SensorSelectionRules.ALL_SENSORS_MESSAGE)
     @Schema(hidden = true)
     public boolean isAllSensorsSelectionValid() {
-        if (allSensors == null || sensorIds == null) {
-            return true;
-        }
-
-        boolean hasSensorNames =
-                sensorNames != null && !sensorNames.isEmpty();
-
-        return !allSensors || sensorIds.isEmpty() && !hasSensorNames;
+        return DateRangeValidator.SensorSelectionRules.isAllSensorsSelectionValid(
+                allSensors,
+                sensorIds,
+                sensorNames
+        );
     }
 
-    @AssertTrue(message = "When allSensors is false, at least one sensor ID or sensor name must be provided")
+    @AssertTrue(message = DateRangeValidator.SensorSelectionRules.SPECIFIC_SENSORS_MESSAGE)
     @Schema(hidden = true)
     public boolean isSpecificSensorsSelectionValid() {
-        if (allSensors == null || sensorIds == null) {
-            return true;
-        }
-
-        boolean hasSensorNames =
-                sensorNames != null && !sensorNames.isEmpty();
-
-        return allSensors || !sensorIds.isEmpty() || hasSensorNames;
+        return DateRangeValidator.SensorSelectionRules.isSpecificSensorsSelectionValid(
+                allSensors,
+                sensorIds,
+                sensorNames
+        );
     }
 }

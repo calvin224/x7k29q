@@ -1,5 +1,6 @@
 package com.calvinpower.weatherservice.exception;
 
+import com.calvinpower.weatherservice.services.validation.DateRangeValidator;
 import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
@@ -20,10 +21,6 @@ import java.util.stream.Collectors;
 public class GlobalExceptionHandler {
 
     private static final String INVALID_REQUEST_TITLE = "Invalid request";
-    private static final String ALL_SENSORS_SELECTION_DETAIL =
-            "When allSensors is true, sensorIds and sensorNames must be empty";
-    private static final String SPECIFIC_SENSORS_SELECTION_DETAIL =
-            "When allSensors is false, at least one sensor ID or sensor name must be provided";
 
     @ExceptionHandler(SensorNotFoundException.class)
     public ResponseEntity<ProblemDetail> handleSensorNotFound(
@@ -91,8 +88,8 @@ public class GlobalExceptionHandler {
                 .stream()
                 .map(error -> error.getDefaultMessage())
                 .filter(Objects::nonNull)
-                .filter(message -> message.equals(ALL_SENSORS_SELECTION_DETAIL)
-                        || message.equals(SPECIFIC_SENSORS_SELECTION_DETAIL))
+                .filter(message -> message.equals(DateRangeValidator.SensorSelectionRules.ALL_SENSORS_MESSAGE)
+                        || message.equals(DateRangeValidator.SensorSelectionRules.SPECIFIC_SENSORS_MESSAGE))
                 .findFirst()
                 .orElse(null);
 
@@ -101,22 +98,22 @@ public class GlobalExceptionHandler {
         String detail = invalidSensorSelection
                 ? sensorSelectionDetail
                 : exception.getBindingResult()
-                        .getAllErrors()
-                        .stream()
-                        .map(error -> {
-                            String message = Objects.requireNonNullElse(
-                                    error.getDefaultMessage(),
-                                    "is invalid"
-                            );
+                .getAllErrors()
+                .stream()
+                .map(error -> {
+                    String message = Objects.requireNonNullElse(
+                            error.getDefaultMessage(),
+                            "is invalid"
+                    );
 
-                            if (error instanceof FieldError fieldError
-                                    && !message.startsWith(fieldError.getField())) {
-                                return fieldError.getField() + " " + message;
-                            }
+                    if (error instanceof FieldError fieldError
+                            && !message.startsWith(fieldError.getField())) {
+                        return fieldError.getField() + " " + message;
+                    }
 
-                            return message;
-                        })
-                        .collect(Collectors.joining("; "));
+                    return message;
+                })
+                .collect(Collectors.joining("; "));
 
         return problem(
                 HttpStatus.BAD_REQUEST,
