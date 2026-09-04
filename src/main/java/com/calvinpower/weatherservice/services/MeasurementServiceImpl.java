@@ -1,5 +1,6 @@
 package com.calvinpower.weatherservice.services;
 
+import com.calvinpower.weatherservice.exception.DuplicateMeasurementException;
 import com.calvinpower.weatherservice.exception.SensorNotFoundException;
 import com.calvinpower.weatherservice.model.Measurement;
 import com.calvinpower.weatherservice.model.Metric;
@@ -11,6 +12,7 @@ import com.calvinpower.weatherservice.repository.SensorRepository;
 import com.calvinpower.weatherservice.services.statistics.StatisticStrategy;
 import com.calvinpower.weatherservice.services.statistics.StatisticStrategyFactory;
 import com.calvinpower.weatherservice.services.validation.DateRangeValidator;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -54,6 +56,14 @@ public class MeasurementServiceImpl implements MeasurementService {
                         new SensorNotFoundException(sensorId)
                 );
 
+        if (measurementRepository.existsBySensor_IdAndMetricAndRecordedAt(
+                sensorId,
+                metric,
+                recordedAt
+        )) {
+            throw new DuplicateMeasurementException(metric);
+        }
+
         Measurement measurement = new Measurement(
                 sensor,
                 metric,
@@ -61,7 +71,11 @@ public class MeasurementServiceImpl implements MeasurementService {
                 recordedAt
         );
 
-        return measurementRepository.save(measurement);
+        try {
+            return measurementRepository.saveAndFlush(measurement);
+        } catch (DataIntegrityViolationException exception) {
+            throw new DuplicateMeasurementException(metric);
+        }
     }
 
     @Override

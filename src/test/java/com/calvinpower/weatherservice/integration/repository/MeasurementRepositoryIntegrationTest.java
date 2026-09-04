@@ -470,6 +470,28 @@ class MeasurementRepositoryIntegrationTest {
     }
 
     @Test
+    void given_duplicate_sensor_metric_and_timestamp_when_flushing_then_database_rejects_duplicate() {
+        Instant recordedAt = Instant.parse("2026-09-01T13:00:00Z");
+
+        measurementRepository.saveAndFlush(new Measurement(
+                sensor,
+                Metric.HUMIDITY,
+                60.0,
+                recordedAt
+        ));
+
+        assertThrows(
+                DataIntegrityViolationException.class,
+                () -> measurementRepository.saveAndFlush(new Measurement(
+                        sensor,
+                        Metric.HUMIDITY,
+                        70.0,
+                        recordedAt
+                ))
+        );
+    }
+
+    @Test
     void given_existing_sensor_name_when_creating_sensor_then_service_reports_duplicate() {
         SensorServiceImpl sensorService =
                 new SensorServiceImpl(sensorRepository);

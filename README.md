@@ -196,6 +196,7 @@ API errors use Spring `ProblemDetail` and the `application/problem+json` media t
 | --- | --- | --- |
 | `SENSOR_NOT_FOUND` | `404 Not Found` | A specifically requested sensor ID or name does not exist |
 | `DUPLICATE_SENSOR_NAME` | `409 Conflict` | A named sensor already exists |
+| `DUPLICATE_MEASUREMENT` | `409 Conflict` | The sensor already has the same metric at the supplied timestamp |
 | `INVALID_DATE_RANGE` | `400 Bad Request` | The supplied date range is incomplete or outside the allowed duration |
 | `INVALID_SENSOR_SELECTION` | `400 Bad Request` | `allSensors`, sensor IDs, and sensor names form an invalid combination |
 | `VALIDATION_FAILED` | `400 Bad Request` | The request body or one of its fields is invalid |

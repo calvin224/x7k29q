@@ -13,6 +13,12 @@ import java.util.Optional;
 
 public interface MeasurementRepository extends JpaRepository<Measurement, Long> {
 
+    boolean existsBySensor_IdAndMetricAndRecordedAt(
+            Long sensorId,
+            Metric metric,
+            Instant recordedAt
+    );
+
     List<Measurement> findBySensor_IdInAndMetricInAndRecordedAtBetween(
             Collection<Long> sensorIds,
             Collection<Metric> metrics,

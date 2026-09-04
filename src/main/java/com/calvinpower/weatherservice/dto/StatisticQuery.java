@@ -64,9 +64,9 @@ public record StatisticQuery(
         Instant to
 ) {
 
-    @AssertTrue(message = "allSensors, sensorIds, and sensorNames must define a valid sensor selection")
+    @AssertTrue(message = "When allSensors is true, sensorIds and sensorNames must be empty")
     @Schema(hidden = true)
-    public boolean isSensorSelectionValid() {
+    public boolean isAllSensorsSelectionValid() {
         if (allSensors == null || sensorIds == null) {
             return true;
         }
@@ -74,8 +74,19 @@ public record StatisticQuery(
         boolean hasSensorNames =
                 sensorNames != null && !sensorNames.isEmpty();
 
-        return allSensors
-                ? sensorIds.isEmpty() && !hasSensorNames
-                : !sensorIds.isEmpty() || hasSensorNames;
+        return !allSensors || sensorIds.isEmpty() && !hasSensorNames;
+    }
+
+    @AssertTrue(message = "When allSensors is false, at least one sensor ID or sensor name must be provided")
+    @Schema(hidden = true)
+    public boolean isSpecificSensorsSelectionValid() {
+        if (allSensors == null || sensorIds == null) {
+            return true;
+        }
+
+        boolean hasSensorNames =
+                sensorNames != null && !sensorNames.isEmpty();
+
+        return allSensors || !sensorIds.isEmpty() || hasSensorNames;
     }
 }

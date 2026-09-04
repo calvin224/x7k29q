@@ -20,6 +20,10 @@ import java.util.stream.Collectors;
 public class GlobalExceptionHandler {
 
     private static final String INVALID_REQUEST_TITLE = "Invalid request";
+    private static final String ALL_SENSORS_SELECTION_DETAIL =
+            "When allSensors is true, sensorIds and sensorNames must be empty";
+    private static final String SPECIFIC_SENSORS_SELECTION_DETAIL =
+            "When allSensors is false, at least one sensor ID or sensor name must be provided";
 
     @ExceptionHandler(SensorNotFoundException.class)
     public ResponseEntity<ProblemDetail> handleSensorNotFound(
@@ -49,6 +53,20 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(DuplicateMeasurementException.class)
+    public ResponseEntity<ProblemDetail> handleDuplicateMeasurement(
+            DuplicateMeasurementException exception,
+            HttpServletRequest request
+    ) {
+        return problem(
+                HttpStatus.CONFLICT,
+                "Measurement already exists",
+                exception.getMessage(),
+                "DUPLICATE_MEASUREMENT",
+                request
+        );
+    }
+
     @ExceptionHandler(InvalidDateRangeException.class)
     public ResponseEntity<ProblemDetail> handleInvalidDateRange(
             InvalidDateRangeException exception,
@@ -68,30 +86,37 @@ public class GlobalExceptionHandler {
             MethodArgumentNotValidException exception,
             HttpServletRequest request
     ) {
-        boolean invalidSensorSelection = exception.getBindingResult()
+        String sensorSelectionDetail = exception.getBindingResult()
                 .getAllErrors()
                 .stream()
                 .map(error -> error.getDefaultMessage())
                 .filter(Objects::nonNull)
-                .anyMatch(message -> message.startsWith("allSensors,"));
+                .filter(message -> message.equals(ALL_SENSORS_SELECTION_DETAIL)
+                        || message.equals(SPECIFIC_SENSORS_SELECTION_DETAIL))
+                .findFirst()
+                .orElse(null);
 
-        String detail = exception.getBindingResult()
-                .getAllErrors()
-                .stream()
-                .map(error -> {
-                    String message = Objects.requireNonNullElse(
-                            error.getDefaultMessage(),
-                            "is invalid"
-                    );
+        boolean invalidSensorSelection = sensorSelectionDetail != null;
 
-                    if (error instanceof FieldError fieldError
-                            && !message.startsWith(fieldError.getField())) {
-                        return fieldError.getField() + " " + message;
-                    }
+        String detail = invalidSensorSelection
+                ? sensorSelectionDetail
+                : exception.getBindingResult()
+                        .getAllErrors()
+                        .stream()
+                        .map(error -> {
+                            String message = Objects.requireNonNullElse(
+                                    error.getDefaultMessage(),
+                                    "is invalid"
+                            );
 
-                    return message;
-                })
-                .collect(Collectors.joining("; "));
+                            if (error instanceof FieldError fieldError
+                                    && !message.startsWith(fieldError.getField())) {
+                                return fieldError.getField() + " " + message;
+                            }
+
+                            return message;
+                        })
+                        .collect(Collectors.joining("; "));
 
         return problem(
                 HttpStatus.BAD_REQUEST,

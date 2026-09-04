@@ -7,6 +7,10 @@ import java.time.Instant;
 @Entity
 @Table(
         name = "sensor_measurements",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uq_sensor_measurements_sensor_metric_recorded_at",
+                columnNames = {"sensor_id", "metric", "recorded_at"}
+        ),
         indexes = {
                 @Index(
                         name = "idx_sensor_measurements_sensor_metric_time",
