@@ -1,12 +1,9 @@
 package com.calvinpower.weatherservice.dto;
 
 import com.calvinpower.weatherservice.model.Metric;
+import com.calvinpower.weatherservice.services.validation.DateRangeValidator;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.AssertTrue;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotEmpty;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.*;
 
 import java.time.Instant;
 import java.util.List;
@@ -56,18 +53,23 @@ public record MeasurementQuery(
         Instant to
 ) {
 
-    @AssertTrue(message = "allSensors, sensorIds, and sensorNames must define a valid sensor selection")
+    @AssertTrue(message = DateRangeValidator.SensorSelectionRules.ALL_SENSORS_MESSAGE)
     @Schema(hidden = true)
-    public boolean isSensorSelectionValid() {
-        if (allSensors == null || sensorIds == null) {
-            return true;
-        }
+    public boolean isAllSensorsSelectionValid() {
+        return DateRangeValidator.SensorSelectionRules.isAllSensorsSelectionValid(
+                allSensors,
+                sensorIds,
+                sensorNames
+        );
+    }
 
-        boolean hasSensorNames =
-                sensorNames != null && !sensorNames.isEmpty();
-
-        return allSensors
-                ? sensorIds.isEmpty() && !hasSensorNames
-                : !sensorIds.isEmpty() || hasSensorNames;
+    @AssertTrue(message = DateRangeValidator.SensorSelectionRules.SPECIFIC_SENSORS_MESSAGE)
+    @Schema(hidden = true)
+    public boolean isSpecificSensorsSelectionValid() {
+        return DateRangeValidator.SensorSelectionRules.isSpecificSensorsSelectionValid(
+                allSensors,
+                sensorIds,
+                sensorNames
+        );
     }
 }

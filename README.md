@@ -165,18 +165,38 @@ When `allSensors` is `true`, both `sensorIds` and `sensorNames` must be empty. U
 
 For specific-sensor queries, the service validates all distinct requested IDs in one bulk database lookup. If any requested sensor does not exist, the endpoint returns `404 Not Found` without querying measurement data. If every sensor exists but no measurements match the requested metrics and date range, the endpoint returns `200 OK` with an empty array. All-sensor queries do not perform specific-sensor validation and also return an empty array when no data matches.
 
-## Statistics Without Dates
+## Measurement and Statistics Query Flow
 
-When a statistical query omits a date range, the service uses the latest one-day period of available matching data. The end of the range is the newest measurement timestamp matching the requested sensors and metrics, rather than the current time. This interpretation was chosen because the challenge defines one day as the minimum valid query range while allowing the date range to be omitted in favour of the latest data.
+Both query endpoints use the sensor and metric filters described above. Their date behaviour differs because measurement queries return raw readings, while statistics queries aggregate readings.
 
-The implicit range is inclusive:
+### Measurement Queries
+
+`POST /api/v1/measurements/query` follows this flow:
+
+- When both `from` and `to` are supplied, it returns every raw measurement matching the selected sensors, metrics, and inclusive date range.
+- When both dates are omitted, it returns only the latest raw measurement for each selected sensor and metric combination. The latest timestamp is resolved independently for each combination.
+- When only one date is supplied, it returns `400 Bad Request` with `INVALID_DATE_RANGE`.
+- When the selection is valid but no measurements match, it returns `200 OK` with an empty array.
+
+For example, if one sensor has temperature readings `10`, `20`, and `30` at increasing timestamps, a measurement query without dates returns only `30`.
+
+### Statistics Queries
+
+`POST /api/v1/statistics/query` follows this flow:
+
+- When both `from` and `to` are supplied, it calculates the selected `MIN`, `MAX`, `SUM`, or `AVERAGE` independently for each sensor and metric across the inclusive date range.
+- When both dates are omitted, it finds the newest timestamp matching the selected sensors and metrics, uses that timestamp as `to`, sets `from` to one day earlier, and calculates the statistic across that inclusive one-day range.
+- When only one date is supplied, it returns `400 Bad Request` with `INVALID_DATE_RANGE`.
+- When the selection is valid but no measurements match, it returns `200 OK` with an empty array.
+
+The implicit statistics range is:
 
 ```text
 to = latest matching measurement timestamp
 from = to - 1 day
 ```
 
-If no measurements match the selected sensors and metrics, the endpoint returns an empty result list.
+The important distinction is that a measurement query without dates returns one latest reading per sensor and metric, whereas a statistics query without dates aggregates all matching readings within the latest one-day window.
 
 ## Error Responses
 
@@ -196,6 +216,7 @@ API errors use Spring `ProblemDetail` and the `application/problem+json` media t
 | --- | --- | --- |
 | `SENSOR_NOT_FOUND` | `404 Not Found` | A specifically requested sensor ID or name does not exist |
 | `DUPLICATE_SENSOR_NAME` | `409 Conflict` | A named sensor already exists |
+| `DUPLICATE_MEASUREMENT` | `409 Conflict` | The sensor already has the same metric at the supplied timestamp |
 | `INVALID_DATE_RANGE` | `400 Bad Request` | The supplied date range is incomplete or outside the allowed duration |
 | `INVALID_SENSOR_SELECTION` | `400 Bad Request` | `allSensors`, sensor IDs, and sensor names form an invalid combination |
 | `VALIDATION_FAILED` | `400 Bad Request` | The request body or one of its fields is invalid |

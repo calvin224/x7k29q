@@ -1,5 +1,6 @@
 package com.calvinpower.weatherservice.unit.services;
 
+import com.calvinpower.weatherservice.exception.DuplicateMeasurementException;
 import com.calvinpower.weatherservice.exception.SensorNotFoundException;
 import com.calvinpower.weatherservice.model.Measurement;
 import com.calvinpower.weatherservice.model.Metric;
@@ -13,6 +14,7 @@ import com.calvinpower.weatherservice.services.statistics.StatisticStrategy;
 import com.calvinpower.weatherservice.services.statistics.StatisticStrategyFactory;
 import com.calvinpower.weatherservice.services.validation.DateRangeValidator;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.Instant;
 import java.util.LinkedHashSet;
@@ -63,7 +65,7 @@ class MeasurementServiceImplTest {
         when(sensorRepository.findById(sensorId))
                 .thenReturn(Optional.of(sensor));
 
-        when(measurementRepository.save(any(Measurement.class)))
+        when(measurementRepository.saveAndFlush(any(Measurement.class)))
                 .thenReturn(measurement);
 
         Measurement result = measurementService.createMeasurement(
@@ -79,7 +81,7 @@ class MeasurementServiceImplTest {
                 .findById(sensorId);
 
         verify(measurementRepository)
-                .save(any(Measurement.class));
+                .saveAndFlush(any(Measurement.class));
     }
 
     @Test
@@ -106,7 +108,59 @@ class MeasurementServiceImplTest {
                 .findById(sensorId);
 
         verify(measurementRepository, never())
-                .save(any(Measurement.class));
+                .saveAndFlush(any(Measurement.class));
+    }
+
+    @Test
+    void given_duplicate_measurement_when_creating_then_reports_duplicate() {
+        Long sensorId = 1L;
+        Metric metric = Metric.TEMPERATURE;
+        Instant recordedAt = Instant.parse("2026-09-02T10:30:00Z");
+
+        when(sensorRepository.findById(sensorId))
+                .thenReturn(Optional.of(new Sensor(sensorId)));
+        when(measurementRepository.existsBySensor_IdAndMetricAndRecordedAt(
+                sensorId,
+                metric,
+                recordedAt
+        )).thenReturn(true);
+
+        assertThrows(
+                DuplicateMeasurementException.class,
+                () -> measurementService.createMeasurement(
+                        sensorId,
+                        metric,
+                        21.5,
+                        recordedAt
+                )
+        );
+
+        verify(measurementRepository, never())
+                .saveAndFlush(any(Measurement.class));
+    }
+
+    @Test
+    void given_concurrent_duplicate_when_flushing_then_reports_duplicate() {
+        Long sensorId = 1L;
+        Metric metric = Metric.TEMPERATURE;
+        Instant recordedAt = Instant.parse("2026-09-02T10:30:00Z");
+
+        when(sensorRepository.findById(sensorId))
+                .thenReturn(Optional.of(new Sensor(sensorId)));
+        when(measurementRepository.saveAndFlush(any(Measurement.class)))
+                .thenThrow(new DataIntegrityViolationException(
+                        "duplicate"
+                ));
+
+        assertThrows(
+                DuplicateMeasurementException.class,
+                () -> measurementService.createMeasurement(
+                        sensorId,
+                        metric,
+                        21.5,
+                        recordedAt
+                )
+        );
     }
 
     @Test

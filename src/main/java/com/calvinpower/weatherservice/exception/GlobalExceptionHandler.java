@@ -1,5 +1,6 @@
 package com.calvinpower.weatherservice.exception;
 
+import com.calvinpower.weatherservice.services.validation.DateRangeValidator;
 import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
@@ -49,6 +50,20 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(DuplicateMeasurementException.class)
+    public ResponseEntity<ProblemDetail> handleDuplicateMeasurement(
+            DuplicateMeasurementException exception,
+            HttpServletRequest request
+    ) {
+        return problem(
+                HttpStatus.CONFLICT,
+                "Measurement already exists",
+                exception.getMessage(),
+                "DUPLICATE_MEASUREMENT",
+                request
+        );
+    }
+
     @ExceptionHandler(InvalidDateRangeException.class)
     public ResponseEntity<ProblemDetail> handleInvalidDateRange(
             InvalidDateRangeException exception,
@@ -68,14 +83,21 @@ public class GlobalExceptionHandler {
             MethodArgumentNotValidException exception,
             HttpServletRequest request
     ) {
-        boolean invalidSensorSelection = exception.getBindingResult()
+        String sensorSelectionDetail = exception.getBindingResult()
                 .getAllErrors()
                 .stream()
                 .map(error -> error.getDefaultMessage())
                 .filter(Objects::nonNull)
-                .anyMatch(message -> message.startsWith("allSensors,"));
+                .filter(message -> message.equals(DateRangeValidator.SensorSelectionRules.ALL_SENSORS_MESSAGE)
+                        || message.equals(DateRangeValidator.SensorSelectionRules.SPECIFIC_SENSORS_MESSAGE))
+                .findFirst()
+                .orElse(null);
 
-        String detail = exception.getBindingResult()
+        boolean invalidSensorSelection = sensorSelectionDetail != null;
+
+        String detail = invalidSensorSelection
+                ? sensorSelectionDetail
+                : exception.getBindingResult()
                 .getAllErrors()
                 .stream()
                 .map(error -> {

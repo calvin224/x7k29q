@@ -69,6 +69,14 @@ public class MeasurementController {
                             mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ApiProblemResponse.class)
                     )
+            ),
+            @ApiResponse(
+                    responseCode = "409",
+                    description = "The sensor already has this metric at the supplied timestamp",
+                    content = @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ApiProblemResponse.class)
+                    )
             )
     })
     public ResponseEntity<MeasurementResponse> createMeasurement(
@@ -111,6 +119,14 @@ public class MeasurementController {
             @ApiResponse(
                     responseCode = "404",
                     description = "Sensor name not found",
+                    content = @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ApiProblemResponse.class)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "409",
+                    description = "The sensor already has this metric at the supplied timestamp",
                     content = @Content(
                             mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ApiProblemResponse.class)
